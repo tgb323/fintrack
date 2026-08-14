@@ -10,7 +10,16 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.5;height:100vh;overflow:hidden}
 .app{display:flex;height:100vh}
-.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:20px 0}
+.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;padding:20px 0;transition:left .25s ease}
+.sidebar-backdrop{display:none;position:fixed;inset:0;z-index:140;background:rgba(0,0,0,.55)}
+.sidebar-toggle{display:none;position:fixed;top:14px;left:14px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 11px;cursor:pointer;color:var(--text);font-size:18px;line-height:1}
+@media(max-width:700px){
+  .sidebar-toggle{display:block}
+  .sidebar{position:fixed;top:0;bottom:0;left:calc(-1 * var(--sidebar-w) - 2px);z-index:150}
+  .sidebar.open{left:0}
+  .sidebar-backdrop.open{display:block}
+  .content{padding-top:56px}
+}
 .sidebar-header{padding:0 16px 24px}
 .logo{display:flex;align-items:center;gap:10px;color:var(--accent);font-weight:700;font-size:16px;letter-spacing:-.3px}
 .logo-icon{font-size:20px}
@@ -229,6 +238,8 @@ input[type=date]:focus{border-color:var(--accent)}
       <button class="refresh-btn" id="refreshBtn">↻ Refresh</button>
     </div>
   </nav>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+  <button class="sidebar-toggle" id="sidebarToggle">☰</button>
   <main class="content">
     <div class="setup-banner" id="setupBanner" style="display:none">
       <div class="setup-inner">
@@ -1786,7 +1797,13 @@ window._saveSettings=function(){
 
 // ── INIT ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',()=>{
-  document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('click',()=>navigateTo(item.dataset.page)));
+  const sidebar=document.querySelector('.sidebar');
+  const backdrop=document.getElementById('sidebarBackdrop');
+  const toggle=document.getElementById('sidebarToggle');
+  function closeSidebar(){sidebar.classList.remove('open');backdrop.classList.remove('open')}
+  toggle.addEventListener('click',()=>{sidebar.classList.toggle('open');backdrop.classList.toggle('open')});
+  backdrop.addEventListener('click',closeSidebar);
+  document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('click',()=>{navigateTo(item.dataset.page);if(window.innerWidth<=700)closeSidebar()}));
   document.getElementById('refreshBtn').addEventListener('click',()=>{appData=null;loadData()});
   if(!SHEET_ID)document.getElementById('setupBanner').style.display='block';
   loadData()});

@@ -727,6 +727,7 @@ function renderDebts(data){
       if(isNaN(val)||val<0){alert('Please enter a valid balance.');return;}
       debts[i].currentBalance=val;
       saveDebts(debts);render();
+      setTimeout(()=>alert(`✓ Balance updated for "${d.name}".\n\n📌 Reminder: Also log this as a liability in Log Net Worth so your net worth stays accurate.`),50);
     };
   }
 

@@ -227,6 +227,7 @@ input[type=date]:focus{border-color:var(--accent)}
       <li class="nav-item" data-page="whatif"><span class="nav-icon">?</span><span class="nav-label">What If</span></li>
       <li class="nav-divider"></li>
       <li class="nav-section">Enter Data</li>
+      <li class="nav-item" data-page="import-csv"><span class="nav-icon">⬆</span><span class="nav-label">Import CSV</span></li>
       <li class="nav-item" data-page="log-expenses"><span class="nav-icon">✎</span><span class="nav-label">Log Expenses</span></li>
       <li class="nav-item" data-page="log-income"><span class="nav-icon">$</span><span class="nav-label">Log Income</span></li>
       <li class="nav-item" data-page="log-networth"><span class="nav-icon">◎</span><span class="nav-label">Log Net Worth</span></li>
@@ -290,6 +291,7 @@ input[type=date]:focus{border-color:var(--accent)}
     <div class="page" id="page-forecast"></div>
     <div class="page" id="page-whatif"></div>
     <div class="page" id="page-debts"></div>
+    <div class="page" id="page-import-csv"></div>
     <div class="page" id="page-log-expenses"></div>
     <div class="page" id="page-log-income"></div>
     <div class="page" id="page-log-networth"></div>
@@ -390,11 +392,11 @@ function calcStateTax(g,s){const st=TAX_2025.states[s?.toUpperCase()];if(!st||st
 function getStateName(c){const n={AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',DC:'D.C.'};return n[c?.toUpperCase()]||c||'Unknown'}
 
 // ── APP ROUTER ───────────────────────────────────────────
-const PAGES=['dashboard','pnl','networth','budget','investments','taxes','forecast','whatif','debts','log-expenses','log-income','log-networth','log-investments','recurring'];
+const PAGES=['dashboard','pnl','networth','budget','investments','taxes','forecast','whatif','debts','import-csv','log-expenses','log-income','log-networth','log-investments','recurring'];
 const chartInstances={};let appData=null;let currentPage='dashboard';
 function destroyChart(id){if(chartInstances[id]){chartInstances[id].destroy();delete chartInstances[id]}}
 function createChart(id,cfg){destroyChart(id);const c=document.getElementById(id);if(!c)return null;const ch=new Chart(c,cfg);chartInstances[id]=ch;return ch}
-function navigateTo(page){if(!PAGES.includes(page))return;currentPage=page;PAGES.forEach(p=>{const el=document.getElementById(`page-${p}`);if(el)el.classList.toggle('active',p===page)});document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.dataset.page===page));if(appData){const r={dashboard:renderDashboard,pnl:renderPnL,networth:renderNetWorth,budget:renderBudget,investments:renderInvestments,taxes:renderTaxes,forecast:renderForecast,whatif:renderWhatIf,debts:renderDebts,'log-expenses':renderLogExpenses,'log-income':renderLogIncome,'log-networth':renderLogNetWorth,'log-investments':renderLogInvestments,recurring:renderRecurring};if(r[page])r[page](appData)}}
+function navigateTo(page){if(!PAGES.includes(page))return;currentPage=page;PAGES.forEach(p=>{const el=document.getElementById(`page-${p}`);if(el)el.classList.toggle('active',p===page)});document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.dataset.page===page));if(appData){const r={dashboard:renderDashboard,pnl:renderPnL,networth:renderNetWorth,budget:renderBudget,investments:renderInvestments,taxes:renderTaxes,forecast:renderForecast,whatif:renderWhatIf,debts:renderDebts,'import-csv':renderImportCSV,'log-expenses':renderLogExpenses,'log-income':renderLogIncome,'log-networth':renderLogNetWorth,'log-investments':renderLogInvestments,recurring:renderRecurring};if(r[page])r[page](appData)}}
 function showLoading(){document.getElementById('loadingState').style.display='flex';document.getElementById('errorState').style.display='none'}
 function hideLoading(){document.getElementById('loadingState').style.display='none'}
 function showError(msg){hideLoading();document.getElementById('errorState').style.display='flex';document.getElementById('errorMsg').textContent=msg||'Failed to load data.'}
@@ -1304,6 +1306,176 @@ function renderWhatIf(data){
   ['wi-name','wi-cost','wi-down','wi-term','wi-apr'].forEach(id=>{
     const el2=document.getElementById(id);
     if(el2)el2.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('wi-btn').click()});
+  });
+}
+
+// ── IMPORT CSV ────────────────────────────────────────────
+function renderImportCSV(data){
+  const el=document.getElementById('page-import-csv');
+  const hasGAS=!!APPS_SCRIPT_URL;
+
+  const AMEX_CAT_MAP=[
+    ['restaurant','Dining'],['dining','Dining'],['food & bev','Dining'],['café','Dining'],['cafe','Dining'],
+    ['grocery','Shopping'],['supermarket','Shopping'],['merchandise','Shopping'],['retail','Shopping'],['amazon','Shopping'],['walmart','Shopping'],['target','Shopping'],['costco','Shopping'],['home depot','Shopping'],
+    ['entertainment','Entertainment'],['movie','Entertainment'],['theater','Entertainment'],
+    ['subscription','Subscriptions'],['streaming','Subscriptions'],['cable','Subscriptions'],
+    ['telephone','Phone'],['wireless','Phone'],['cellular','Phone'],
+    ['internet services','Internet'],
+    ['gas station','Fuel'],['fuel','Fuel'],['gasoline','Fuel'],
+    ['automotive','Car'],['auto ','Car'],
+    ['insurance','Insurance'],
+    ['utilities','Utilities'],
+    ['mortgage','Mortgage'],
+    ['loan','Loan'],
+    ['membership','Membership'],
+  ];
+  const DESC_MAP=[
+    ['netflix','Subscriptions'],['hulu','Subscriptions'],['spotify','Subscriptions'],['apple music','Subscriptions'],
+    ['apple tv','Subscriptions'],['espn','Subscriptions'],['chatgpt','Subscriptions'],['claude.ai','Subscriptions'],
+    ['icloud','Subscriptions'],['youtube premium','Subscriptions'],['disney','Subscriptions'],
+    ['xfinity','Internet'],['comcast','Internet'],
+    ['at&t','Phone'],['verizon','Phone'],['t-mobile','Phone'],
+    ['shell','Fuel'],['chevron','Fuel'],['exxon','Fuel'],['bp ','Fuel'],['circle k','Fuel'],['sinclair','Fuel'],
+    ['mcdonald','Dining'],['starbucks','Dining'],['chipotle','Dining'],['doordash','Dining'],
+    ['uber eats','Dining'],['grubhub','Dining'],['chick-fil','Dining'],['panera','Dining'],
+    ['amazon','Shopping'],['walmart','Shopping'],['target','Shopping'],['costco','Shopping'],
+    ['home depot','Shopping'],["lowe's",'Shopping'],['best buy','Shopping'],
+  ];
+
+  function guessCategory(desc,amexCat){
+    const d=desc.toLowerCase();
+    for(const[kw,cat]of DESC_MAP){if(d.includes(kw))return cat;}
+    if(amexCat){const ac=amexCat.toLowerCase();for(const[kw,cat]of AMEX_CAT_MAP){if(ac.includes(kw))return cat;}}
+    return'Random';
+  }
+
+  function parseCSVLine(line){
+    const cols=[];let cur='',inQ=false;
+    for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){inQ=!inQ}else if(c===','&&!inQ){cols.push(cur.trim());cur=''}else{cur+=c}}
+    cols.push(cur.trim());return cols;
+  }
+
+  function parseAmexCSV(text){
+    const lines=text.trim().split(/\r?\n/);
+    const hdrs=parseCSVLine(lines[0]).map(h=>h.replace(/"/g,'').trim().toLowerCase());
+    const di=hdrs.findIndex(h=>h==='date');
+    const dsi=hdrs.findIndex(h=>h.includes('description'));
+    const ai=hdrs.findIndex(h=>h==='amount');
+    const ci=hdrs.findIndex(h=>h==='category');
+    if(di<0||ai<0)return null;
+    const rows=[];
+    for(let i=1;i<lines.length;i++){
+      if(!lines[i].trim())continue;
+      const cols=parseCSVLine(lines[i]);
+      const date=(cols[di]||'').replace(/"/g,'').trim();
+      const desc=(dsi>=0?(cols[dsi]||''):'').replace(/"/g,'').trim();
+      const amtStr=(cols[ai]||'').replace(/["$,]/g,'').trim();
+      const amexCat=ci>=0?(cols[ci]||'').replace(/"/g,'').trim():'';
+      const amt=parseFloat(amtStr);
+      if(!date||isNaN(amt)||amt<=0)continue;
+      const dateFmt=date.replace(/\//g,'-');
+      rows.push({date:dateFmt,desc,amt,amexCat,cat:guessCategory(desc,amexCat),include:true});
+    }
+    return rows;
+  }
+
+  const catOpts=EXPENSE_CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+  el.innerHTML=`
+  <div class="page-header"><div><div class="page-title">Import CSV</div>
+  <div class="page-subtitle">Upload an American Express CSV to bulk-import transactions</div></div></div>
+  ${!hasGAS?`<div class="gas-banner"><div class="gas-banner-icon">⚠</div><div><strong>Apps Script URL not set</strong><p>You can preview transactions below, but saving requires your Apps Script URL. Add it via <a onclick="window._openSettings()" style="cursor:pointer;color:var(--accent)">⚙ Settings</a>.</p></div></div>`:''}
+  <div class="chart-card" style="margin-bottom:20px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">How to export from American Express</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.8">
+      1. Log in at americanexpress.com<br>
+      2. Go to <strong>Account → Statements & Activity</strong><br>
+      3. Click <strong>Download</strong> → select date range → choose <strong>CSV</strong><br>
+      4. Upload that file below
+    </div>
+  </div>
+  <div class="chart-card" style="margin-bottom:20px;text-align:center;padding:32px">
+    <div style="font-size:32px;margin-bottom:12px">⬆</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px">Choose your Amex CSV file</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px">Payments and credits are automatically excluded</div>
+    <input type="file" id="csv-file-input" accept=".csv" style="display:none">
+    <button class="btn btn-primary" onclick="document.getElementById('csv-file-input').click()">Browse File</button>
+    <div id="csv-file-name" style="margin-top:10px;font-size:12px;color:var(--text-dim)"></div>
+  </div>
+  <div id="csv-preview" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div id="csv-summary" style="font-size:13px;color:var(--text-dim)"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="csv-select-all" checked> Select all
+        </label>
+        <button class="btn btn-primary" id="csv-import-btn" ${!hasGAS?'disabled title="Set Apps Script URL first"':''}>Import Selected</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+    <table class="data-table" id="csv-table">
+      <thead><tr><th style="width:32px"></th><th>Date</th><th>Description</th><th class="text-right">Amount</th><th>Category</th></tr></thead>
+      <tbody id="csv-tbody"></tbody>
+    </table>
+    </div>
+    <div id="csv-msg" style="margin-top:12px;font-size:13px"></div>
+  </div>`;
+
+  let parsedRows=[];
+
+  document.getElementById('csv-file-input').addEventListener('change',function(){
+    const file=this.files[0];if(!file)return;
+    document.getElementById('csv-file-name').textContent=file.name;
+    const reader=new FileReader();
+    reader.onload=function(e){
+      parsedRows=parseAmexCSV(e.target.result)||[];
+      if(!parsedRows.length){alert('No expense transactions found. Make sure this is an Amex CSV file.');return;}
+      buildTable();
+      document.getElementById('csv-preview').style.display='block';
+    };
+    reader.readAsText(file);
+  });
+
+  function buildTable(){
+    const total=parsedRows.filter(r=>r.include).reduce((s,r)=>s+r.amt,0);
+    const sel=parsedRows.filter(r=>r.include).length;
+    document.getElementById('csv-summary').textContent=`${parsedRows.length} transactions found · ${sel} selected · ${fmt(total)} total`;
+    document.getElementById('csv-tbody').innerHTML=parsedRows.map((r,i)=>`
+      <tr style="${r.include?'':'opacity:.4'}">
+        <td><input type="checkbox" ${r.include?'checked':''} onchange="window._csvToggle(${i},this.checked)"></td>
+        <td style="white-space:nowrap">${r.date}</td>
+        <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.desc}">${r.desc}</td>
+        <td class="text-right">${fmt(r.amt)}</td>
+        <td><select style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:4px 6px;color:var(--text);font-size:12px;width:100%" onchange="window._csvCat(${i},this.value)">${EXPENSE_CATS.map(c=>`<option value="${c}" ${c===r.cat?'selected':''}>${c}</option>`).join('')}</select></td>
+      </tr>`).join('');
+  }
+
+  window._csvToggle=function(i,v){parsedRows[i].include=v;buildTable()};
+  window._csvCat=function(i,v){parsedRows[i].cat=v};
+
+  document.getElementById('csv-select-all').addEventListener('change',function(){
+    parsedRows.forEach(r=>r.include=this.checked);buildTable();
+  });
+
+  document.getElementById('csv-import-btn').addEventListener('click',async function(){
+    const selected=parsedRows.filter(r=>r.include);
+    if(!selected.length){alert('No transactions selected.');return;}
+    const btn=this;btn.disabled=true;btn.textContent=`Importing 0/${selected.length}…`;
+    const msgEl=document.getElementById('csv-msg');
+    let done=0,errors=0;
+    for(const r of selected){
+      try{
+        const row=[r.date,0,...EXPENSE_CATS.map(c=>c===r.cat?r.amt:0)];
+        await apiAppend('Expenses',row);
+        done++;btn.textContent=`Importing ${done}/${selected.length}…`;
+      }catch(e){errors++;}
+    }
+    btn.disabled=false;btn.textContent='Import Selected';
+    msgEl.innerHTML=errors===0
+      ?`<span style="color:var(--accent)">✓ ${done} transactions imported successfully. Hit ↻ Refresh to see updated data.</span>`
+      :`<span style="color:var(--yellow)">⚠ ${done} imported, ${errors} failed. Try again for failed rows.</span>`;
+    parsedRows=parsedRows.filter(r=>!r.include);
+    buildTable();
   });
 }
 

@@ -335,7 +335,7 @@ window.deleteEntryRow=async function(tab,rowIndex,msgId){
 };
 
 // ── CONSTANTS ───────────────────────────────────────────
-const EXPENSE_CATS = ['Shopping','Dining','Entertainment','Subscriptions','Utilities','Mortgage','Car','Fuel','Phone','Internet','Random','Loan','Membership','Insurance'];
+const EXPENSE_CATS = ['Shopping','Groceries','Dining','Entertainment','Subscriptions','Utilities','Mortgage','Car','Fuel','Phone','Internet','Random','Loan','Membership','Insurance'];
 
 // ── CSV PARSER ──────────────────────────────────────────
 function parseCSVLine(line){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){q=!q}else if(ch===','&&!q){r.push(c);c=''}else{c+=ch}}r.push(c);return r}
@@ -1316,7 +1316,7 @@ function renderImportCSV(data){
 
   const AMEX_CAT_MAP=[
     ['restaurant','Dining'],['dining','Dining'],['food & bev','Dining'],['café','Dining'],['cafe','Dining'],
-    ['grocery','Shopping'],['supermarket','Shopping'],['merchandise','Shopping'],['retail','Shopping'],['amazon','Shopping'],['walmart','Shopping'],['target','Shopping'],['costco','Shopping'],['home depot','Shopping'],
+    ['grocery','Groceries'],['supermarket','Groceries'],['merchandise','Shopping'],['retail','Shopping'],['amazon','Shopping'],['walmart','Shopping'],['target','Shopping'],['costco','Groceries'],['home depot','Shopping'],
     ['entertainment','Entertainment'],['movie','Entertainment'],['theater','Entertainment'],
     ['subscription','Subscriptions'],['streaming','Subscriptions'],['cable','Subscriptions'],
     ['telephone','Phone'],['wireless','Phone'],['cellular','Phone'],
@@ -1338,7 +1338,9 @@ function renderImportCSV(data){
     ['shell','Fuel'],['chevron','Fuel'],['exxon','Fuel'],['bp ','Fuel'],['circle k','Fuel'],['sinclair','Fuel'],
     ['mcdonald','Dining'],['starbucks','Dining'],['chipotle','Dining'],['doordash','Dining'],
     ['uber eats','Dining'],['grubhub','Dining'],['chick-fil','Dining'],['panera','Dining'],
-    ['amazon','Shopping'],['walmart','Shopping'],['target','Shopping'],['costco','Shopping'],
+    ['amazon','Shopping'],['walmart','Groceries'],['target','Groceries'],['costco','Groceries'],
+    ['kroger','Groceries'],['safeway','Groceries'],['whole foods','Groceries'],['trader joe','Groceries'],
+    ['albertsons','Groceries'],['smiths','Groceries'],["sam's club",'Groceries'],
     ['home depot','Shopping'],["lowe's",'Shopping'],['best buy','Shopping'],
   ];
 

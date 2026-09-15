@@ -335,7 +335,7 @@ window.deleteEntryRow=async function(tab,rowIndex,msgId){
 };
 
 // ── CONSTANTS ───────────────────────────────────────────
-const EXPENSE_CATS = ['Shopping','Groceries','Dining','Entertainment','Subscriptions','Utilities','Mortgage','Car','Fuel','Phone','Internet','Random','Loan','Membership','Insurance'];
+const EXPENSE_CATS = ['Shopping','Groceries','Dining','Entertainment','Subscriptions','Utilities','Mortgage','Car','Fuel','Phone','Internet','Random','Loan','Membership','Insurance','Health','Interest'];
 
 // ── CSV PARSER ──────────────────────────────────────────
 function parseCSVLine(line){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){q=!q}else if(ch===','&&!q){r.push(c);c=''}else{c+=ch}}r.push(c);return r}
@@ -1324,6 +1324,8 @@ function renderImportCSV(data){
     ['gas station','Fuel'],['fuel','Fuel'],['gasoline','Fuel'],
     ['automotive','Car'],['auto ','Car'],
     ['insurance','Insurance'],
+    ['health','Health'],['medical','Health'],['dental','Health'],['pharmacy','Health'],['doctor','Health'],
+    ['interest','Interest'],
     ['utilities','Utilities'],
     ['mortgage','Mortgage'],
     ['loan','Loan'],

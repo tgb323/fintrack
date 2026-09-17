@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fintrack</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{--bg:#0d0d0d;--surface:#1c1c1e;--surface-2:#2c2c2e;--surface-3:#3a3a3c;--accent:#00e5a0;--accent-dim:rgba(0,229,160,0.15);--danger:#ff453a;--danger-dim:rgba(255,69,58,0.15);--blue:#0a84ff;--blue-dim:rgba(10,132,255,0.15);--yellow:#ffd60a;--text:#ffffff;--text-muted:#8e8e93;--text-dim:#636366;--border:rgba(255,255,255,0.08);--sidebar-w:200px;--radius:12px;--radius-sm:8px}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -245,16 +246,17 @@ input[type=date]:focus{border-color:var(--accent)}
     <div class="setup-banner" id="setupBanner" style="display:none">
       <div class="setup-inner">
         <h2>⚙ Fintrack Settings</h2>
-        <p style="color:var(--text-dim);margin-bottom:20px">Your credentials are saved privately on this device only — they never leave your browser.</p>
+        <p style="color:var(--text-dim);margin-bottom:20px">Your credentials are saved privately on this device — they never leave your browser.</p>
         <div style="display:grid;gap:14px;margin-bottom:20px">
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Google Sheet ID <span style="color:var(--danger)">*</span></label>
-            <input id="setup-sheet-id" type="text" placeholder="Paste your Sheet ID here…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--text);font-size:13px;font-family:monospace;box-sizing:border-box">
-            <p style="font-size:12px;color:var(--text-dim);margin-top:5px">Found in your Sheet URL: docs.google.com/spreadsheets/d/<strong style="color:var(--text)">THIS_PART</strong>/edit</p>
+            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Supabase Project URL <span style="color:var(--danger)">*</span></label>
+            <input id="setup-supa-url" type="text" placeholder="https://xxxxxxxxxxxx.supabase.co" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--text);font-size:13px;font-family:monospace;box-sizing:border-box">
+            <p style="font-size:12px;color:var(--text-dim);margin-top:5px">Found in your Supabase project → Settings → API</p>
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Apps Script URL <span style="color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0">(optional — enables saving data)</span></label>
-            <input id="setup-gas-url" type="text" placeholder="https://script.google.com/macros/s/…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--text);font-size:13px;font-family:monospace;box-sizing:border-box">
+            <label style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Supabase Anon Key <span style="color:var(--danger)">*</span></label>
+            <input id="setup-supa-key" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp…" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:var(--text);font-size:13px;font-family:monospace;box-sizing:border-box">
+            <p style="font-size:12px;color:var(--text-dim);margin-top:5px">Found in your Supabase project → Settings → API → anon public</p>
           </div>
         </div>
         <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:24px">
@@ -263,15 +265,15 @@ input[type=date]:focus{border-color:var(--accent)}
           <span id="setup-msg" style="font-size:13px"></span>
         </div>
         <details class="sheet-template">
-          <summary>Sheet tab structure (click to expand)</summary>
+          <summary>Supabase table structure (click to expand)</summary>
           <div class="template-grid">
-            <div class="template-block"><strong>Expenses</strong><code>date, income, Shopping, Dining, Entertainment, Subscriptions, Utilities, Mortgage, Car, Fuel, Phone, Internet, Random, Loan, Membership</code><em>Date: MM-DD-YYYY. One row per entry. Log expenses any time.</em></div>
-            <div class="template-block"><strong>Net Worth</strong><code>date, name, value, type</code><em>type = "asset" or "liability". Add rows whenever balances change.</em></div>
-            <div class="template-block"><strong>Budget</strong><code>category, monthly_budget</code><em>One row per expense category. Match category names to Expenses columns.</em></div>
-            <div class="template-block"><strong>Income</strong><code>date, gross_pay, net_pay, federal_withheld, state_withheld, other_withheld</code><em>One row per paycheck. Date: MM-DD-YYYY.</em></div>
-            <div class="template-block"><strong>Recurring</strong><code>category, name, amount, frequency, day</code><em>Auto-fill rules for Log Expenses. name = optional label (e.g. "SBA Loan"). frequency = weekly/monthly/biweekly.</em></div>
-            <div class="template-block"><strong>Investments</strong><code>date, account, value</code><em>account = Crypto, IRA, Money Market, or HYSA. Add rows when balances change.</em></div>
-            <div class="template-block"><strong>Settings</strong><code>key, value</code><em>Keys: expected_return_pct, monthly_savings, filing_status (single/married_joint/head_of_household), state (e.g. TX)</em></div>
+            <div class="template-block"><strong>expenses</strong><code>id, date, income, Shopping, Groceries, Dining, Entertainment, Subscriptions, Utilities, Mortgage, Car, Fuel, Phone, Internet, Random, Loan, Membership, Insurance, Health, Interest</code><em>One row per log entry. Use quoted column names in SQL for capitalized categories.</em></div>
+            <div class="template-block"><strong>net_worth</strong><code>id, date, name, value, type</code><em>type = "asset" or "liability".</em></div>
+            <div class="template-block"><strong>budget</strong><code>id, category, monthly_budget</code><em>One row per category. Add UNIQUE constraint on category for upserts.</em></div>
+            <div class="template-block"><strong>income</strong><code>id, date, gross_pay, net_pay, federal_withheld, state_withheld, other_withheld</code><em>One row per paycheck.</em></div>
+            <div class="template-block"><strong>recurring</strong><code>id, category, name, amount, frequency, day</code><em>frequency = monthly/weekly/biweekly.</em></div>
+            <div class="template-block"><strong>investments</strong><code>id, date, account, value</code><em>account = IRA, HYSA, Money Market, Crypto, Cash, or Insurance.</em></div>
+            <div class="template-block"><strong>settings</strong><code>id, key, value</code><em>Keys: expected_return_pct, monthly_savings, filing_status, state (e.g. TX)</em></div>
           </div>
         </details>
       </div>
@@ -279,7 +281,7 @@ input[type=date]:focus{border-color:var(--accent)}
     <div class="loading-state" id="loadingState" style="display:none"><div class="spinner"></div><p>Loading your data…</p></div>
     <div class="error-state" id="errorState" style="display:none">
       <p class="error-icon">⚠</p><p id="errorMsg">Failed to load data.</p>
-      <p class="error-hint">Check that your Sheet ID is correct and the sheet is set to "Anyone with the link can view."</p>
+      <p class="error-hint">Check your Supabase URL and anon key in ⚙ Settings, and that your tables exist and RLS policies allow access.</p>
       <button onclick="window.location.reload()">Try again</button>
     </div>
     <div class="page active" id="page-dashboard"></div>
@@ -301,23 +303,35 @@ input[type=date]:focus{border-color:var(--accent)}
 </div>
 <script>
 // ── CONFIG — stored in localStorage, set via ⚙ Settings ─
-let SHEET_ID = localStorage.getItem('fintrack_sheet_id') || '';
-let APPS_SCRIPT_URL = localStorage.getItem('fintrack_gas_url') || '';
+let SUPABASE_URL = localStorage.getItem('fintrack_supabase_url') || '';
+let SUPABASE_ANON_KEY = localStorage.getItem('fintrack_supabase_key') || '';
+let _sbClient = null;
+function getClient(){
+  if(!_sbClient&&SUPABASE_URL&&SUPABASE_ANON_KEY)
+    _sbClient=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  return _sbClient;
+}
+async function sbFetch(table,cols='*',orderBy=null){
+  const q=getClient().from(table).select(cols);
+  const{data,error}=orderBy?await q.order(orderBy):await q;
+  if(error)throw new Error(`Load ${table}: ${error.message}`);
+  return data||[];
+}
+async function sbInsert(table,row){
+  const{error}=await getClient().from(table).insert(row);
+  if(error)throw new Error(`Save to ${table}: ${error.message}`);
+}
+async function sbDelete(table,id){
+  const{error}=await getClient().from(table).delete().eq('id',id);
+  if(error)throw new Error(`Delete from ${table}: ${error.message}`);
+}
+async function sbUpsert(table,rows,conflict){
+  const{error}=await getClient().from(table).upsert(rows,{onConflict:conflict});
+  if(error)throw new Error(`Upsert ${table}: ${error.message}`);
+}
 
-// ── APPS SCRIPT API (GET-based to avoid redirect/CORS issues) ──
-async function apiCall(params){
-  if(!APPS_SCRIPT_URL)throw new Error('Add your Apps Script URL in ⚙ Settings to enable data entry');
-  const qs=Object.entries(params).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
-  const res=await fetch(APPS_SCRIPT_URL+'?'+qs);
-  if(!res.ok)throw new Error(`API request failed (${res.status})`);
-  const j=await res.json();if(j.error)throw new Error(j.error);return j}
-async function apiRead(tab){return(await apiCall({action:'read',tab})).values||[]}
-async function apiAppend(tab,row){return apiCall({action:'append',tab,row:JSON.stringify(row)})}
-async function apiUpdate(tab,ri,row){return apiCall({action:'update',tab,rowIndex:ri,row:JSON.stringify(row)})}
-async function apiDelete(tab,ri){return apiCall({action:'delete',tab,rowIndex:ri})}
-
-// ── GAS SETUP BANNER HTML ───────────────────────────────
-const GAS_BANNER_HTML=`<div class="gas-banner"><div class="gas-banner-icon">⚠</div><div><strong>Apps Script URL not set</strong><p>To save data directly from Fintrack, deploy the Google Apps Script web app and add its URL via <a onclick="window._openSettings()" style="cursor:pointer;color:var(--accent)">⚙ Settings</a>.</p></div></div>`;
+// ── SUPABASE SETUP BANNER ───────────────────────────────
+const GAS_BANNER_HTML=`<div class="gas-banner"><div class="gas-banner-icon">⚠</div><div><strong>Supabase not connected</strong><p>Add your Supabase URL and anon key via <a onclick="window._openSettings()" style="cursor:pointer;color:var(--accent)">⚙ Settings</a> to save data.</p></div></div>`;
 
 // ── UI HELPER ───────────────────────────────────────────
 function showMsg(id,msg,type,duration=6000){
@@ -326,10 +340,10 @@ function showMsg(id,msg,type,duration=6000){
   if(duration>0)setTimeout(()=>{el.className='entry-msg';el.textContent=''},duration)}
 
 // ── SHARED DELETE HANDLER ────────────────────────────────
-window.deleteEntryRow=async function(tab,rowIndex,msgId){
+window.deleteEntryRow=async function(table,id,msgId){
   if(!confirm('Delete this entry? This cannot be undone.'))return;
   try{
-    await apiDelete(tab,rowIndex);
+    await sbDelete(table,id);
     showMsg(msgId,'✓ Deleted. Hit Refresh (↻) to update charts.','success');
   }catch(e){showMsg(msgId,'Error: '+e.message,'error')}
 };
@@ -341,13 +355,6 @@ const EXPENSE_CATS = ['Shopping','Groceries','Dining','Entertainment','Subscript
 function parseCSVLine(line){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){q=!q}else if(ch===','&&!q){r.push(c);c=''}else{c+=ch}}r.push(c);return r}
 function parseCSV(text){const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);if(lines.length<2)return[];const headers=parseCSVLine(lines[0]).map(h=>h.replace(/^"|"$/g,'').trim());return lines.slice(1).map(line=>{const vals=parseCSVLine(line);const obj={};headers.forEach((h,i)=>{obj[h]=(vals[i]||'').replace(/^"|"$/g,'').trim()});return obj}).filter(row=>Object.values(row).some(v=>v!==''))}
 
-// ── FETCH (CSV via fetch API — CORS supported by Google Sheets) ─────────────
-async function fetchTab(tab){
-  const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tab)}`;
-  const res=await fetch(url);
-  if(!res.ok)throw new Error(`Tab "${tab}" failed (${res.status}) — check Sheet ID and public sharing`);
-  return parseCSV(await res.text());
-}
 
 // ── DEMO DATA ───────────────────────────────────────────
 function generateDemoData(){
@@ -373,9 +380,18 @@ function generateDemoData(){
 
 // ── MAIN getData ────────────────────────────────────────
 async function getData(){
-  if(!SHEET_ID)return generateDemoData();
-  const[expenses,nw,budget,income,investments,sr,recurring]=await Promise.all([fetchTab('Expenses'),fetchTab('Net Worth'),fetchTab('Budget'),fetchTab('Income'),fetchTab('Investments'),fetchTab('Settings'),fetchTab('Recurring').catch(()=>[])]);
-  const settings={};sr.forEach(r=>{settings[r.key]=r.value});if(settings.filing_status)settings.filing_status=settings.filing_status.toLowerCase().replace(/ /g,'_');
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY)return generateDemoData();
+  const[expenses,nw,budget,income,investments,sr,recurring]=await Promise.all([
+    sbFetch('expenses','*','date'),
+    sbFetch('net_worth','*','date'),
+    sbFetch('budget'),
+    sbFetch('income','*','date'),
+    sbFetch('investments','*','date'),
+    sbFetch('settings'),
+    sbFetch('recurring')
+  ]);
+  const settings={};sr.forEach(r=>{settings[r.key]=r.value});
+  if(settings.filing_status)settings.filing_status=settings.filing_status.toLowerCase().replace(/ /g,'_');
   return{expenses,netWorth:nw,budget,income,investments,settings,recurring,isDemo:false}}
 
 // ── HELPERS ─────────────────────────────────────────────
@@ -404,7 +420,7 @@ async function loadData(){showLoading();try{appData=await getData();hideLoading(
 Chart.defaults.color='#8e8e93';Chart.defaults.borderColor='rgba(255,255,255,0.06)';Chart.defaults.font.family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";Chart.defaults.font.size=12;
 
 // ── HELPERS ──────────────────────────────────────────────
-function emptyState(el, msg){el.innerHTML=`<div class="page-header"><div><div class="page-title">${msg}</div><div class="page-subtitle">Add data to your Google Sheet to see charts here.</div></div></div>`}
+function emptyState(el, msg){el.innerHTML=`<div class="page-header"><div><div class="page-title">${msg}</div><div class="page-subtitle">Add data to your Supabase tables to see charts here.</div></div></div>`}
 
 // ── OVERVIEW (DASHBOARD) ─────────────────────────────────
 function renderDashboard(data){
@@ -851,7 +867,7 @@ function renderNetWorth(data){
 // ── BUDGET ───────────────────────────────────────────────
 function renderBudget(data){
   const el=document.getElementById('page-budget');
-  const hasGAS=!!APPS_SCRIPT_URL;
+  const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
 
   // Expense actuals by month — keyed by EXPENSE_CAT name exactly
   const expByMonth={};
@@ -946,9 +962,9 @@ function renderBudget(data){
     const badge=type=>type==='investment'?`<span style="font-size:10px;background:rgba(191,90,242,0.15);color:#bf5af2;padding:2px 6px;border-radius:3px">inv</span>`:`<span style="font-size:10px;background:var(--surface-2);color:var(--text-dim);padding:2px 6px;border-radius:3px">exp</span>`;
     return`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="section-title" style="margin:0">Category Breakdown</div>
-      ${hasGAS?`<button onclick="window._budEdit(true)" style="${btnStyle}">✎ Set Budgets</button>`:''}
+      ${hasSupabase?`<button onclick="window._budEdit(true)" style="${btnStyle}">✎ Set Budgets</button>`:''}
     </div>
-    ${rows.length===0?`<div style="text-align:center;padding:48px;color:var(--text-muted);background:var(--surface);border-radius:var(--radius)">${hasGAS?'No spending logged or budgets set yet.<br><br><button onclick="window._budEdit(true)" style="background:var(--accent);border:none;color:#000;padding:8px 18px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:600">✎ Set Budgets</button>':'Log expenses or set budgets to see data here.'}</div>`
+    ${rows.length===0?`<div style="text-align:center;padding:48px;color:var(--text-muted);background:var(--surface);border-radius:var(--radius)">${hasSupabase?'No spending logged or budgets set yet.<br><br><button onclick="window._budEdit(true)" style="background:var(--accent);border:none;color:#000;padding:8px 18px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;font-weight:600">✎ Set Budgets</button>':'Log expenses or set budgets to see data here.'}</div>`
     :`<div class="table-card"><table class="data-table">
       <thead><tr><th>Category</th><th style="width:70px;text-align:center;font-size:10px;color:var(--text-dim)">SOURCE</th><th class="text-right">Budget</th><th class="text-right">Actual</th><th class="text-right">Remaining</th><th style="min-width:140px">Progress</th></tr></thead>
       <tbody>
@@ -1014,8 +1030,8 @@ function renderBudget(data){
         newRows.forEach(r=>{budgetMap[r.category.toLowerCase()]=parseAmt(r.monthly_budget)});
         data.budget=newRows;
         renderContent(mk,false);
-        // Best-effort GAS sync in background (don't block UI on failure)
-        if(hasGAS){(async()=>{try{const old=data.budget.length;for(let i=old+1;i>=2;i--){try{await apiDelete('Budget',i)}catch(e){}}for(const row of newRows)await apiAppend('Budget',row);}catch(e){console.warn('Budget GAS sync failed:',e.message)}})()}
+        // Sync to Supabase in background (don't block UI on failure)
+        if(hasSupabase){(async()=>{try{await sbUpsert('budget',newRows,'category');}catch(e){console.warn('Budget Supabase sync failed:',e.message)}})()}
       }catch(e){
         msgEl.innerHTML=`<div style="color:var(--danger);margin-bottom:10px;font-size:13px">⚠ Save failed: ${e.message}</div>`;
         btn.textContent='Save';btn.disabled=false}})}
@@ -1312,7 +1328,7 @@ function renderWhatIf(data){
 // ── IMPORT CSV ────────────────────────────────────────────
 function renderImportCSV(data){
   const el=document.getElementById('page-import-csv');
-  const hasGAS=!!APPS_SCRIPT_URL;
+  const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
 
   const AMEX_CAT_MAP=[
     ['restaurant','Dining'],['dining','Dining'],['food & bev','Dining'],['café','Dining'],['cafe','Dining'],
@@ -1388,7 +1404,7 @@ function renderImportCSV(data){
   el.innerHTML=`
   <div class="page-header"><div><div class="page-title">Import CSV</div>
   <div class="page-subtitle">Upload an American Express CSV to bulk-import transactions</div></div></div>
-  ${!hasGAS?`<div class="gas-banner"><div class="gas-banner-icon">⚠</div><div><strong>Apps Script URL not set</strong><p>You can preview transactions below, but saving requires your Apps Script URL. Add it via <a onclick="window._openSettings()" style="cursor:pointer;color:var(--accent)">⚙ Settings</a>.</p></div></div>`:''}
+  ${!hasSupabase?`<div class="gas-banner"><div class="gas-banner-icon">⚠</div><div><strong>Supabase not connected</strong><p>You can preview transactions below, but saving requires Supabase credentials. Add them via <a onclick="window._openSettings()" style="cursor:pointer;color:var(--accent)">⚙ Settings</a>.</p></div></div>`:''}
   <div class="chart-card" style="margin-bottom:20px">
     <div style="font-size:13px;font-weight:600;margin-bottom:8px">How to export from American Express</div>
     <div style="font-size:13px;color:var(--text-dim);line-height:1.8">
@@ -1413,7 +1429,7 @@ function renderImportCSV(data){
         <label style="font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px;cursor:pointer">
           <input type="checkbox" id="csv-select-all" checked> Select all
         </label>
-        <button class="btn btn-primary" id="csv-import-btn" ${!hasGAS?'disabled title="Set Apps Script URL first"':''}>Import Selected</button>
+        <button class="btn btn-primary" id="csv-import-btn" ${!hasSupabase?'disabled title="Connect Supabase in Settings first"':''}>Import Selected</button>
       </div>
     </div>
     <div style="overflow-x:auto">
@@ -1469,8 +1485,8 @@ function renderImportCSV(data){
     let done=0,errors=0;
     for(const r of selected){
       try{
-        const row=[r.date,0,...EXPENSE_CATS.map(c=>c===r.cat?r.amt:0)];
-        await apiAppend('Expenses',row);
+        const row={date:r.date,income:0};EXPENSE_CATS.forEach(c=>{row[c]=c===r.cat?r.amt:0});
+        await sbInsert('expenses',row);
         done++;btn.textContent=`Importing ${done}/${selected.length}…`;
       }catch(e){errors++;}
     }
@@ -1488,8 +1504,8 @@ function renderLogExpenses(data){
   const el=document.getElementById('page-log-expenses');
   const today=new Date().toISOString().slice(0,10);
   const rec=(data.recurring||[]).filter(r=>r.category&&r.amount);
-  const hasGAS=!!APPS_SCRIPT_URL;
-  const recent=data.expenses.map((r,i)=>({...r,_rowIndex:i+2})).sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,10);
+  const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
+  const recent=data.expenses.slice().sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,10);
 
   // ── Snapshot: current month + YTD ──
   const now=new Date();const curMK=monthKey(now);const curYr=now.getFullYear();
@@ -1518,7 +1534,7 @@ function renderLogExpenses(data){
       <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted);padding:5px 0;border-top:1px solid var(--border)"><span>Savings Rate</span><span style="color:${ytdNet>=0?'var(--accent)':'var(--danger)'}">${snap.ytd.inc>0?Math.round(ytdNet/snap.ytd.inc*100):0}%</span></div>
     </div>
   </div>`:''}
-  ${!hasGAS?GAS_BANNER_HTML:''}
+  ${!hasSupabase?GAS_BANNER_HTML:''}
   <div class="chart-card" style="margin-bottom:24px">
     <div class="entry-grid-2" style="max-width:380px">
       <div class="form-group"><label>Week Date</label><input type="date" id="lw-date" value="${today}"></div>
@@ -1530,16 +1546,16 @@ function renderLogExpenses(data){
     </div>
     <div class="form-actions">
       ${rec.length?`<button class="btn btn-secondary" id="lw-load-rec">↻ Load Recurring</button>`:''}
-      <button class="btn btn-primary" id="lw-submit"${!hasGAS?' disabled title="Set APPS_SCRIPT_URL first"':''}>Save Entry</button>
+      <button class="btn btn-primary" id="lw-submit"${!hasSupabase?' disabled title="Connect Supabase in Settings first"':''}>Save Entry</button>
     </div>
     <div class="entry-msg" id="lw-msg"></div>
   </div>
   <div class="section-title">Recent Entries</div>
   <div class="table-card">
     <table class="data-table">
-      <thead><tr><th>Date</th><th class="text-right">Income</th><th class="text-right">Expenses</th><th class="text-right">Net</th>${hasGAS?'<th style="width:70px"></th>':''}</tr></thead>
+      <thead><tr><th>Date</th><th class="text-right">Income</th><th class="text-right">Expenses</th><th class="text-right">Net</th>${hasSupabase?'<th style="width:70px"></th>':''}</tr></thead>
       <tbody>
-      ${recent.length?recent.map(r=>{const inc=parseAmt(r.income);const exp=EXPENSE_CATS.reduce((s,c)=>s+parseAmt(r[c]),0);const net=inc-exp;return`<tr><td>${r.date}</td><td class="text-right positive">${fmt(inc)}</td><td class="text-right negative">${fmt(exp)}</td><td class="text-right ${net>=0?'positive':'negative'}">${fmt(net)}</td>${hasGAS?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('Expenses',${r._rowIndex},'lw-msg')">Delete</button></td>`:''}</tr>`}).join(''):`<tr><td colspan="${hasGAS?5:4}" style="text-align:center;color:var(--text-dim);padding:24px">No entries yet</td></tr>`}
+      ${recent.length?recent.map(r=>{const inc=parseAmt(r.income);const exp=EXPENSE_CATS.reduce((s,c)=>s+parseAmt(r[c]),0);const net=inc-exp;return`<tr><td>${r.date}</td><td class="text-right positive">${fmt(inc)}</td><td class="text-right negative">${fmt(exp)}</td><td class="text-right ${net>=0?'positive':'negative'}">${fmt(net)}</td>${hasSupabase?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('expenses',${r.id},'lw-msg')">Delete</button></td>`:''}</tr>`}).join(''):`<tr><td colspan="${hasSupabase?5:4}" style="text-align:center;color:var(--text-dim);padding:24px">No entries yet</td></tr>`}
       </tbody>
     </table>
   </div>`;
@@ -1549,14 +1565,15 @@ function renderLogExpenses(data){
       showMsg('lw-msg','Recurring amounts loaded — adjust as needed then save.','success');
     });
   }
-  if(hasGAS){
+  if(hasSupabase){
     document.getElementById('lw-submit').addEventListener('click',async()=>{
       const date=document.getElementById('lw-date').value;
       if(!date){showMsg('lw-msg','Date is required','error');return;}
-      const row=[date,parseAmt(document.getElementById('lw-income').value),...EXPENSE_CATS.map(c=>parseAmt(document.getElementById(`lw-cat-${c}`).value))];
+      const row={date,income:parseAmt(document.getElementById('lw-income').value)};
+      EXPENSE_CATS.forEach(c=>{row[c]=parseAmt(document.getElementById(`lw-cat-${c}`).value)});
       const btn=document.getElementById('lw-submit');btn.disabled=true;btn.textContent='Saving…';
       try{
-        await apiAppend('Expenses',row);
+        await sbInsert('expenses',row);
         showMsg('lw-msg','✓ Saved! Hit Refresh (↻) to update charts.','success');
         document.getElementById('lw-income').value='';
         EXPENSE_CATS.forEach(c=>{const i=document.getElementById(`lw-cat-${c}`);if(i)i.value=''});
@@ -1570,8 +1587,8 @@ function renderLogExpenses(data){
 function renderLogIncome(data){
   const el=document.getElementById('page-log-income');
   const today=new Date().toISOString().slice(0,10);
-  const hasGAS=!!APPS_SCRIPT_URL;
-  const recent=data.income.map((r,i)=>({...r,_rowIndex:i+2})).sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,20);
+  const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
+  const recent=data.income.slice().sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,20);
 
   // ── Annual totals snapshot ──
   const yr=new Date().getFullYear();
@@ -1593,7 +1610,7 @@ function renderLogIncome(data){
       <div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Total Withheld</div><div style="font-size:22px;font-weight:700;color:var(--danger)">${fmt(totalWithheld)}</div><div style="font-size:11px;color:var(--text-dim);margin-top:2px">${ytd.gross>0?Math.round(totalWithheld/ytd.gross*100):0}% of gross</div></div>
     </div>
   </div>`:''}
-  ${!hasGAS?GAS_BANNER_HTML:''}
+  ${!hasSupabase?GAS_BANNER_HTML:''}
   <div class="chart-card" style="margin-bottom:24px">
     <div class="entry-grid-2" style="max-width:520px">
       <div class="form-group"><label>Date</label><input type="date" id="li-date" value="${today}"></div>
@@ -1604,27 +1621,27 @@ function renderLogIncome(data){
       <div class="form-group"><label>Other Withheld ($)</label><input type="number" id="li-other" placeholder="0.00" step="0.01" min="0"></div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary" id="li-submit"${!hasGAS?' disabled title="Set APPS_SCRIPT_URL first"':''}>Save Paycheck</button>
+      <button class="btn btn-primary" id="li-submit"${!hasSupabase?' disabled title="Connect Supabase in Settings first"':''}>Save Paycheck</button>
     </div>
     <div class="entry-msg" id="li-msg"></div>
   </div>
   <div class="section-title">Recent Paychecks</div>
   <div class="table-card">
     <table class="data-table">
-      <thead><tr><th>Date</th><th class="text-right">Gross</th><th class="text-right">Net</th><th class="text-right">Federal</th><th class="text-right">State</th><th class="text-right">Other</th>${hasGAS?'<th style="width:70px"></th>':''}</tr></thead>
+      <thead><tr><th>Date</th><th class="text-right">Gross</th><th class="text-right">Net</th><th class="text-right">Federal</th><th class="text-right">State</th><th class="text-right">Other</th>${hasSupabase?'<th style="width:70px"></th>':''}</tr></thead>
       <tbody>
-      ${recent.length?recent.map(r=>`<tr><td>${r.date}</td><td class="text-right">${fmt(parseAmt(r.gross_pay))}</td><td class="text-right positive">${fmt(parseAmt(r.net_pay))}</td><td class="text-right negative">${fmt(parseAmt(r.federal_withheld))}</td><td class="text-right negative">${fmt(parseAmt(r.state_withheld))}</td><td class="text-right negative">${fmt(parseAmt(r.other_withheld))}</td>${hasGAS?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('Income',${r._rowIndex},'li-msg')">Delete</button></td>`:''}</tr>`).join(''):`<tr><td colspan="${hasGAS?7:6}" style="text-align:center;color:var(--text-dim);padding:24px">No paychecks logged yet</td></tr>`}
+      ${recent.length?recent.map(r=>`<tr><td>${r.date}</td><td class="text-right">${fmt(parseAmt(r.gross_pay))}</td><td class="text-right positive">${fmt(parseAmt(r.net_pay))}</td><td class="text-right negative">${fmt(parseAmt(r.federal_withheld))}</td><td class="text-right negative">${fmt(parseAmt(r.state_withheld))}</td><td class="text-right negative">${fmt(parseAmt(r.other_withheld))}</td>${hasSupabase?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('income',${r.id},'li-msg')">Delete</button></td>`:''}</tr>`).join(''):`<tr><td colspan="${hasSupabase?7:6}" style="text-align:center;color:var(--text-dim);padding:24px">No paychecks logged yet</td></tr>`}
       </tbody>
     </table>
   </div>`;
-  if(hasGAS){
+  if(hasSupabase){
     document.getElementById('li-submit').addEventListener('click',async()=>{
       const date=document.getElementById('li-date').value;
       if(!date){showMsg('li-msg','Date is required','error');return;}
-      const row=[date,parseAmt(document.getElementById('li-gross').value),parseAmt(document.getElementById('li-net').value),parseAmt(document.getElementById('li-fed').value),parseAmt(document.getElementById('li-state').value),parseAmt(document.getElementById('li-other').value)];
+      const row={date,gross_pay:parseAmt(document.getElementById('li-gross').value),net_pay:parseAmt(document.getElementById('li-net').value),federal_withheld:parseAmt(document.getElementById('li-fed').value),state_withheld:parseAmt(document.getElementById('li-state').value),other_withheld:parseAmt(document.getElementById('li-other').value)};
       const btn=document.getElementById('li-submit');btn.disabled=true;btn.textContent='Saving…';
       try{
-        await apiAppend('Income',row);
+        await sbInsert('income',row);
         showMsg('li-msg','✓ Paycheck saved! Hit Refresh (↻) to update Taxes and charts.','success');
         ['li-gross','li-net','li-fed','li-state','li-other'].forEach(id=>{const i=document.getElementById(id);if(i)i.value=''});
       }catch(e){showMsg('li-msg','Error: '+e.message,'error')}
@@ -1637,8 +1654,8 @@ function renderLogIncome(data){
 function renderLogNetWorth(data){
   const el=document.getElementById('page-log-networth');
   const today=new Date().toISOString().slice(0,10);
-  const hasGAS=!!APPS_SCRIPT_URL;
-  const recent=data.netWorth.map((r,i)=>({...r,_rowIndex:i+2})).sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,20);
+  const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
+  const recent=data.netWorth.slice().sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,20);
   const existingNames=[...new Set(data.netWorth.map(r=>r.name).filter(Boolean))];
 
   // ── Net worth snapshot: latest date's entries ──
@@ -1665,7 +1682,7 @@ function renderLogNetWorth(data){
       <div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Debt-to-Asset</div><div style="font-size:22px;font-weight:700">${lat.assets>0?Math.round(lat.liabilities/lat.assets*100):0}%</div></div>
     </div>
   </div>`:''}
-  ${!hasGAS?GAS_BANNER_HTML:''}
+  ${!hasSupabase?GAS_BANNER_HTML:''}
   <div class="chart-card" style="margin-bottom:24px">
     <div class="entry-grid-2" style="max-width:500px">
       <div class="form-group"><label>Date</label><input type="date" id="lnw-date" value="${today}"></div>
@@ -1679,30 +1696,29 @@ function renderLogNetWorth(data){
       <div class="form-group"><label>Value ($)</label><input type="number" id="lnw-value" placeholder="0.00" step="0.01" min="0"></div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary" id="lnw-submit"${!hasGAS?' disabled title="Set APPS_SCRIPT_URL first"':''}>Add Entry</button>
+      <button class="btn btn-primary" id="lnw-submit"${!hasSupabase?' disabled title="Connect Supabase in Settings first"':''}>Add Entry</button>
     </div>
     <div class="entry-msg" id="lnw-msg"></div>
   </div>
   <div class="section-title">Recent Net Worth Entries</div>
   <div class="table-card">
     <table class="data-table">
-      <thead><tr><th>Date</th><th>Name</th><th>Type</th><th class="text-right">Value</th>${hasGAS?'<th style="width:70px"></th>':''}</tr></thead>
+      <thead><tr><th>Date</th><th>Name</th><th>Type</th><th class="text-right">Value</th>${hasSupabase?'<th style="width:70px"></th>':''}</tr></thead>
       <tbody>
-      ${recent.length?recent.map(r=>`<tr><td>${r.date}</td><td>${r.name||'—'}</td><td><span style="color:${r.type==='asset'?'var(--accent)':'var(--danger)'}">${r.type||'—'}</span></td><td class="text-right ${r.type==='asset'?'positive':'negative'}">${fmt(parseAmt(r.value))}</td>${hasGAS?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('Net Worth',${r._rowIndex},'lnw-msg')">Delete</button></td>`:''}</tr>`).join(''):`<tr><td colspan="${hasGAS?5:4}" style="text-align:center;color:var(--text-dim);padding:24px">No entries yet</td></tr>`}
+      ${recent.length?recent.map(r=>`<tr><td>${r.date}</td><td>${r.name||'—'}</td><td><span style="color:${r.type==='asset'?'var(--accent)':'var(--danger)'}">${r.type||'—'}</span></td><td class="text-right ${r.type==='asset'?'positive':'negative'}">${fmt(parseAmt(r.value))}</td>${hasSupabase?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('net_worth',${r.id},'lnw-msg')">Delete</button></td>`:''}</tr>`).join(''):`<tr><td colspan="${hasSupabase?5:4}" style="text-align:center;color:var(--text-dim);padding:24px">No entries yet</td></tr>`}
       </tbody>
     </table>
   </div>`;
-  if(hasGAS){
+  if(hasSupabase){
     document.getElementById('lnw-submit').addEventListener('click',async()=>{
       const date=document.getElementById('lnw-date').value;
       const name=document.getElementById('lnw-name').value.trim();
       const type=document.getElementById('lnw-type').value;
       const value=parseAmt(document.getElementById('lnw-value').value);
       if(!date||!name){showMsg('lnw-msg','Date and Name are required','error');return;}
-      const row=[date,name,value,type];
       const btn=document.getElementById('lnw-submit');btn.disabled=true;btn.textContent='Saving…';
       try{
-        await apiAppend('Net Worth',row);
+        await sbInsert('net_worth',{date,name,value,type});
         showMsg('lnw-msg','✓ Entry saved! Hit Refresh (↻) to update Net Worth charts.','success');
         document.getElementById('lnw-name').value='';document.getElementById('lnw-value').value='';
       }catch(e){showMsg('lnw-msg','Error: '+e.message,'error')}
@@ -1715,13 +1731,13 @@ function renderLogNetWorth(data){
 function renderLogInvestments(data){
   const el=document.getElementById('page-log-investments');
   const today=new Date().toISOString().slice(0,10);
-  const hasGAS=!!APPS_SCRIPT_URL;
+  const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
   const ACCS=['IRA','HYSA','Money Market','Crypto','Cash','Insurance'];
-  const recent=data.investments.map((r,i)=>({...r,_rowIndex:i+2})).sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,20);
+  const recent=data.investments.slice().sort((a,b)=>{const da=parseDate(a.date),db=parseDate(b.date);return(db||0)-(da||0)}).slice(0,20);
   const latest={};data.investments.forEach(r=>{const d=parseDate(r.date);if(!d||!r.account)return;const acc=r.account.trim();if(!latest[acc]||parseDate(latest[acc].date)<d)latest[acc]=r});
   el.innerHTML=`
   <div class="page-header"><div><div class="page-title">Log Investments</div><div class="page-subtitle">Update account balances</div></div></div>
-  ${!hasGAS?GAS_BANNER_HTML:''}
+  ${!hasSupabase?GAS_BANNER_HTML:''}
   <div class="kpi-row" style="margin-bottom:16px">
     ${ACCS.map(a=>`<div class="kpi-card"><div class="kpi-label">${a}</div><div class="kpi-value">${latest[a]?fmt(parseAmt(latest[a].value)):'—'}</div><div class="kpi-sub">${latest[a]?'Last: '+latest[a].date:'No data'}</div></div>`).join('')}
   </div>
@@ -1734,29 +1750,28 @@ function renderLogInvestments(data){
       <div class="form-group"><label>Current Balance ($)</label><input type="number" id="linv-value" placeholder="0.00" step="0.01" min="0"></div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary" id="linv-submit"${!hasGAS?' disabled title="Set APPS_SCRIPT_URL first"':''}>Save Balance</button>
+      <button class="btn btn-primary" id="linv-submit"${!hasSupabase?' disabled title="Connect Supabase in Settings first"':''}>Save Balance</button>
     </div>
     <div class="entry-msg" id="linv-msg"></div>
   </div>
   <div class="section-title">Recent Updates</div>
   <div class="table-card">
     <table class="data-table">
-      <thead><tr><th>Date</th><th>Account</th><th class="text-right">Balance</th>${hasGAS?'<th style="width:70px"></th>':''}</tr></thead>
+      <thead><tr><th>Date</th><th>Account</th><th class="text-right">Balance</th>${hasSupabase?'<th style="width:70px"></th>':''}</tr></thead>
       <tbody>
-      ${recent.length?recent.map(r=>`<tr><td>${r.date}</td><td>${r.account||'—'}</td><td class="text-right positive">${fmt(parseAmt(r.value))}</td>${hasGAS?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('Investments',${r._rowIndex},'linv-msg')">Delete</button></td>`:''}</tr>`).join(''):`<tr><td colspan="${hasGAS?4:3}" style="text-align:center;color:var(--text-dim);padding:24px">No entries yet</td></tr>`}
+      ${recent.length?recent.map(r=>`<tr><td>${r.date}</td><td>${r.account||'—'}</td><td class="text-right positive">${fmt(parseAmt(r.value))}</td>${hasSupabase?`<td><button class="btn btn-sm btn-danger" onclick="deleteEntryRow('investments',${r.id},'linv-msg')">Delete</button></td>`:''}</tr>`).join(''):`<tr><td colspan="${hasSupabase?4:3}" style="text-align:center;color:var(--text-dim);padding:24px">No entries yet</td></tr>`}
       </tbody>
     </table>
   </div>`;
-  if(hasGAS){
+  if(hasSupabase){
     document.getElementById('linv-submit').addEventListener('click',async()=>{
       const date=document.getElementById('linv-date').value;
       const account=document.getElementById('linv-account').value;
       const value=parseAmt(document.getElementById('linv-value').value);
       if(!date){showMsg('linv-msg','Date is required','error');return;}
-      const row=[date,account,value];
       const btn=document.getElementById('linv-submit');btn.disabled=true;btn.textContent='Saving…';
       try{
-        await apiAppend('Investments',row);
+        await sbInsert('investments',{date,account,value});
         showMsg('linv-msg','✓ Balance saved! Hit Refresh (↻) to update charts.','success');
         document.getElementById('linv-value').value='';
       }catch(e){showMsg('linv-msg','Error: '+e.message,'error')}
@@ -1768,11 +1783,8 @@ function renderLogInvestments(data){
 // ── RECURRING MANAGER ─────────────────────────────────────
 function renderRecurring(data){
   const el=document.getElementById('page-recurring');
-  const hasGAS=!!APPS_SCRIPT_URL;
-  // Stamp each rule with its true sheet row index BEFORE any sorting or filtering
-  const recRaw=(data.recurring||[])
-    .map((r,i)=>({...r,_rowIndex:i+2})) // +2: row 1 is the header
-    .filter(r=>r.category&&r.amount);
+  const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
+  const recRaw=(data.recurring||[]).filter(r=>r.category&&r.amount);
   // sort state
   let sortCol='category', sortDir=1; // 1=asc, -1=desc
   function sortedRec(){
@@ -1799,7 +1811,7 @@ function renderRecurring(data){
       ${thLabel('amount','Amount',true)}
       ${thLabel('frequency','Frequency')}
       ${thLabel('day','Day')}
-      ${hasGAS?'<th style="width:80px"></th>':''}
+      ${hasSupabase?'<th style="width:80px"></th>':''}
     </tr></thead><tbody>
     ${rows.map(r=>`<tr>
       <td><strong>${r.category||'—'}</strong></td>
@@ -1807,7 +1819,7 @@ function renderRecurring(data){
       <td class="text-right">${fmt(parseAmt(r.amount))}</td>
       <td style="color:var(--text-muted)">${r.frequency||'—'}</td>
       <td style="color:var(--text-muted)">${r.day||'—'}</td>
-      ${hasGAS?`<td><button class="btn btn-sm btn-danger" onclick="deleteRecurringRow(${r._rowIndex})">Delete</button></td>`:''}
+      ${hasSupabase?`<td><button class="btn btn-sm btn-danger" onclick="deleteRecurringRow(${r.id})">Delete</button></td>`:''}
     </tr>`).join('')}
     </tbody></table>`;
   }
@@ -1849,7 +1861,7 @@ function renderRecurring(data){
     <div><div class="page-title">Recurring Expenses</div><div class="page-subtitle">These amounts auto-fill when you click "Load Recurring" on the Log Expenses page</div></div>
     <button class="btn btn-primary" id="rec-toggle-btn" onclick="recToggleForm()">+ Add Rule</button>
   </div>
-  ${!hasGAS?GAS_BANNER_HTML:''}
+  ${!hasSupabase?GAS_BANNER_HTML:''}
   ${recRaw.length?`
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;gap:32px;flex-wrap:wrap">
     <div>
@@ -1887,7 +1899,7 @@ function renderRecurring(data){
       <div class="form-group"><label>Day (1–31 or Mon, etc.)</label><input type="text" id="rec-day" placeholder="e.g. 1, 15, Mon"></div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-primary" id="rec-submit"${!hasGAS?' disabled title="Set APPS_SCRIPT_URL first"':''}>Save Rule</button>
+      <button class="btn btn-primary" id="rec-submit"${!hasSupabase?' disabled title="Connect Supabase in Settings first"':''}>Save Rule</button>
       <button class="btn btn-secondary" onclick="recToggleForm()">Cancel</button>
     </div>
     <div class="entry-msg" id="rec-msg"></div>
@@ -1908,10 +1920,10 @@ function renderRecurring(data){
   <div id="rec-recon-detail" style="display:none"></div>
   `:''}
   `;
-  window.deleteRecurringRow=async function(rowIndex){
+  window.deleteRecurringRow=async function(id){
     if(!confirm('Delete this recurring rule?'))return;
     try{
-      await apiDelete('Recurring',rowIndex);
+      await sbDelete('recurring',id);
       showMsg('rec-msg','Rule deleted. Reload (↻) to update.','success');
     }catch(e){alert('Error: '+e.message)}
   };
@@ -1930,7 +1942,7 @@ function renderRecurring(data){
     detail.scrollIntoView({behavior:'smooth',block:'nearest'});
   };
 
-  if(hasGAS){
+  if(hasSupabase){
     document.getElementById('rec-submit').addEventListener('click',async()=>{
       const cat=document.getElementById('rec-cat').value;
       const name=document.getElementById('rec-name').value.trim();
@@ -1938,10 +1950,9 @@ function renderRecurring(data){
       const freq=document.getElementById('rec-freq').value;
       const day=document.getElementById('rec-day').value.trim();
       if(!amount){showMsg('rec-msg','Amount is required','error');return;}
-      const row=[cat,name,amount,freq,day];
       const btn=document.getElementById('rec-submit');btn.disabled=true;btn.textContent='Saving…';
       try{
-        await apiAppend('Recurring',row);
+        await sbInsert('recurring',{category:cat,name,amount,frequency:freq,day});
         showMsg('rec-msg','✓ Rule added! Reload (↻) to see it in the list and use it in Log Expenses.','success');
         document.getElementById('rec-name').value='';
         document.getElementById('rec-amount').value='';
@@ -1954,20 +1965,19 @@ function renderRecurring(data){
 
 // ── SETTINGS ─────────────────────────────────────────────
 window._openSettings=function(){
-  document.getElementById('setup-sheet-id').value=SHEET_ID||'';
-  document.getElementById('setup-gas-url').value=APPS_SCRIPT_URL||'';
+  document.getElementById('setup-supa-url').value=SUPABASE_URL||'';
+  document.getElementById('setup-supa-key').value=SUPABASE_ANON_KEY||'';
   document.getElementById('setup-msg').innerHTML='';
   document.getElementById('setupBanner').style.display='block';
   document.querySelector('.content').scrollTop=0;
 };
 window._saveSettings=function(){
-  const sid=document.getElementById('setup-sheet-id').value.trim();
-  const gas=document.getElementById('setup-gas-url').value.trim();
-  if(!sid){document.getElementById('setup-msg').innerHTML='<span style="color:var(--danger)">Sheet ID is required.</span>';return;}
-  localStorage.setItem('fintrack_sheet_id',sid);
-  if(gas)localStorage.setItem('fintrack_gas_url',gas);
-  else localStorage.removeItem('fintrack_gas_url');
-  SHEET_ID=sid;APPS_SCRIPT_URL=gas;
+  const url=document.getElementById('setup-supa-url').value.trim();
+  const key=document.getElementById('setup-supa-key').value.trim();
+  if(!url||!key){document.getElementById('setup-msg').innerHTML='<span style="color:var(--danger)">Both Supabase URL and anon key are required.</span>';return;}
+  localStorage.setItem('fintrack_supabase_url',url);
+  localStorage.setItem('fintrack_supabase_key',key);
+  SUPABASE_URL=url;SUPABASE_ANON_KEY=key;_sbClient=null;
   document.getElementById('setup-msg').innerHTML='<span style="color:var(--accent)">✓ Saved!</span>';
   setTimeout(()=>{document.getElementById('setupBanner').style.display='none';appData=null;loadData();},600);
 };
@@ -1982,7 +1992,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   backdrop.addEventListener('click',closeSidebar);
   document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('click',()=>{navigateTo(item.dataset.page);if(window.innerWidth<=700)closeSidebar()}));
   document.getElementById('refreshBtn').addEventListener('click',()=>{appData=null;loadData()});
-  if(!SHEET_ID)document.getElementById('setupBanner').style.display='block';
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY)document.getElementById('setupBanner').style.display='block';
   loadData()});
 </script>
 </body>

@@ -2120,7 +2120,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.querySelectorAll('.nav-item').forEach(item=>item.addEventListener('click',()=>{navigateTo(item.dataset.page);if(window.innerWidth<=700)closeSidebar()}));
   document.getElementById('refreshBtn').addEventListener('click',()=>{appData=null;loadData()});
   if(!SUPABASE_URL||!SUPABASE_ANON_KEY)document.getElementById('setupBanner').style.display='block';
-  loadData()});
+  // Wait for Supabase CDN script to be ready before loading data
+  function waitForSupabase(cb,attempts=0){
+    if(typeof supabase!=='undefined'&&supabase.createClient)return cb();
+    if(attempts>20)return cb();
+    setTimeout(()=>waitForSupabase(cb,attempts+1),150);
+  }
+  waitForSupabase(()=>loadData())});
 </script>
 </body>
 </html>

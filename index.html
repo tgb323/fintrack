@@ -353,16 +353,38 @@ const EXPENSE_CATS = ['Shopping','Groceries','Dining','Entertainment','Subscript
 
 // ── MERCHANT RULES (localStorage) ───────────────────────
 function getMerchantRules(){try{return JSON.parse(localStorage.getItem('fintrack_merchant_rules')||'{}')}catch{return{}}}
-function saveMerchantRule(desc,cat){
+function _merchantKey(desc){
   const words=desc.toLowerCase().replace(/[^a-z\s]/g,' ').trim().split(/\s+/).filter(w=>w.length>2);
-  const key=words.slice(0,3).join(' ');
-  if(key.length<3)return;
-  const rules=getMerchantRules();rules[key]=cat;
-  localStorage.setItem('fintrack_merchant_rules',JSON.stringify(rules));
+  return words.slice(0,3).join(' ');
 }
-function checkMerchantRules(desc){
+function saveMerchantRule(desc,cat,amt){
+  const key=_merchantKey(desc);if(key.length<3)return null;
+  const rules=getMerchantRules();const existing=rules[key];
+  if(!existing){rules[key]=cat;}
+  else if(typeof existing==='string'){
+    if(existing===cat)return null;
+    // Conflict: split by amount — new cat for ≤ this amount, old cat for larger
+    rules[key]=[{cat,maxAmt:amt},{cat:existing}];
+    localStorage.setItem('fintrack_merchant_rules',JSON.stringify(rules));
+    return{conflict:true,key,threshold:amt,newCat:cat,oldCat:existing};
+  } else {
+    // Already amount-split — update whichever bracket matches this amount
+    let matched=false;
+    for(const entry of existing){if(entry.maxAmt==null||amt<=entry.maxAmt){entry.cat=cat;matched=true;break;}}
+    if(!matched)existing[existing.length-1].cat=cat;
+    rules[key]=existing;
+  }
+  localStorage.setItem('fintrack_merchant_rules',JSON.stringify(rules));
+  return null;
+}
+function checkMerchantRules(desc,amt){
   const rules=getMerchantRules();const d=desc.toLowerCase();
-  for(const[key,cat]of Object.entries(rules)){if(d.includes(key))return cat;}
+  for(const[key,rule]of Object.entries(rules)){
+    if(!d.includes(key))continue;
+    if(typeof rule==='string')return rule;
+    for(const entry of rule){if(entry.maxAmt==null||amt<=entry.maxAmt)return entry.cat;}
+    return rule[rule.length-1].cat;
+  }
   return null;
 }
 function deleteMerchantRule(key){
@@ -1379,8 +1401,8 @@ function renderImportCSV(data){
     ['home depot','Shopping'],["lowe's",'Shopping'],['best buy','Shopping'],
   ];
 
-  function guessCategory(desc,amexCat){
-    const saved=checkMerchantRules(desc);if(saved)return{cat:saved,src:'rule'};
+  function guessCategory(desc,amexCat,amt){
+    const saved=checkMerchantRules(desc,amt);if(saved)return{cat:saved,src:'rule'};
     const d=desc.toLowerCase();
     for(const[kw,cat]of DESC_MAP){if(d.includes(kw))return{cat,src:'known'};}
     if(amexCat){const ac=amexCat.toLowerCase();for(const[kw,cat]of AMEX_CAT_MAP){if(ac.includes(kw))return{cat,src:'guess'};}}
@@ -1416,7 +1438,7 @@ function renderImportCSV(data){
       const amt=parseFloat(amtStr);
       if(!date||isNaN(amt)||amt<=0)continue;
       const dateFmt=date.replace(/\//g,'-');
-      const{cat,src}=guessCategory(desc,amexCat);
+      const{cat,src}=guessCategory(desc,amexCat,amt);
       const rec=isRecurringMatch({amt,cat});
       rows.push({date:dateFmt,desc,amt,amexCat,cat,src,isRecurring:rec,include:!rec});
     }
@@ -1491,8 +1513,8 @@ function renderImportCSV(data){
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px">📌 Saved Merchant Rules (${keys.length})</div>
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
         <table class="data-table">
-          <thead><tr><th>Merchant keyword</th><th>Category</th><th style="width:60px"></th></tr></thead>
-          <tbody>${keys.map(k=>`<tr><td style="font-family:monospace;font-size:12px">${k}</td><td>${rules[k]}</td><td><button class="btn btn-sm btn-danger" onclick="window._deleteRule('${k.replace(/'/g,"\\'")}')">✕</button></td></tr>`).join('')}</tbody>
+          <thead><tr><th>Merchant keyword</th><th>Rule</th><th style="width:60px"></th></tr></thead>
+          <tbody>${keys.map(k=>{const rule=rules[k];const ruleText=typeof rule==='string'?rule:rule.map((e,i)=>i<rule.length-1?`≤$${e.maxAmt} → ${e.cat}`:`otherwise → ${e.cat}`).join(', ');return`<tr><td style="font-family:monospace;font-size:12px">${k}</td><td style="font-size:12px">${ruleText}</td><td><button class="btn btn-sm btn-danger" onclick="window._deleteRule('${k.replace(/'/g,"\\'")}')">✕</button></td></tr>`;}).join('')}</tbody>
         </table>
       </div>
     </div>`;
@@ -1522,7 +1544,12 @@ function renderImportCSV(data){
   window._csvToggle=function(i,v){parsedRows[i].include=v;buildTable()};
   window._csvCat=function(i,v){
     parsedRows[i].cat=v;parsedRows[i].src='rule';
-    saveMerchantRule(parsedRows[i].desc,v);
+    const conflict=saveMerchantRule(parsedRows[i].desc,v,parsedRows[i].amt);
+    if(conflict){
+      const msgEl=document.getElementById('csv-msg');
+      if(msgEl){msgEl.innerHTML=`<span style="color:var(--accent)">📌 ${conflict.key}: <strong>${conflict.newCat}</strong> for ≤$${conflict.threshold.toFixed(2)}, <strong>${conflict.oldCat}</strong> for larger amounts</span>`;
+      setTimeout(()=>{msgEl.innerHTML=''},7000);}
+    }
     buildTable();
   };
   window._deleteRule=function(key){

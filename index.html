@@ -351,6 +351,25 @@ window.deleteEntryRow=async function(table,id,msgId){
 // ── CONSTANTS ───────────────────────────────────────────
 const EXPENSE_CATS = ['Shopping','Groceries','Dining','Entertainment','Subscriptions','Utilities','Mortgage','Car','Fuel','Phone','Internet','Random','Loan','Membership','Insurance','Health','Interest'];
 
+// ── MERCHANT RULES (localStorage) ───────────────────────
+function getMerchantRules(){try{return JSON.parse(localStorage.getItem('fintrack_merchant_rules')||'{}')}catch{return{}}}
+function saveMerchantRule(desc,cat){
+  const words=desc.toLowerCase().replace(/[^a-z\s]/g,' ').trim().split(/\s+/).filter(w=>w.length>2);
+  const key=words.slice(0,3).join(' ');
+  if(key.length<3)return;
+  const rules=getMerchantRules();rules[key]=cat;
+  localStorage.setItem('fintrack_merchant_rules',JSON.stringify(rules));
+}
+function checkMerchantRules(desc){
+  const rules=getMerchantRules();const d=desc.toLowerCase();
+  for(const[key,cat]of Object.entries(rules)){if(d.includes(key))return cat;}
+  return null;
+}
+function deleteMerchantRule(key){
+  const rules=getMerchantRules();delete rules[key];
+  localStorage.setItem('fintrack_merchant_rules',JSON.stringify(rules));
+}
+
 // ── CSV PARSER ──────────────────────────────────────────
 function parseCSVLine(line){const r=[];let c='',q=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){q=!q}else if(ch===','&&!q){r.push(c);c=''}else{c+=ch}}r.push(c);return r}
 function parseCSV(text){const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);if(lines.length<2)return[];const headers=parseCSVLine(lines[0]).map(h=>h.replace(/^"|"$/g,'').trim());return lines.slice(1).map(line=>{const vals=parseCSVLine(line);const obj={};headers.forEach((h,i)=>{obj[h]=(vals[i]||'').replace(/^"|"$/g,'').trim()});return obj}).filter(row=>Object.values(row).some(v=>v!==''))}
@@ -1329,10 +1348,12 @@ function renderWhatIf(data){
 function renderImportCSV(data){
   const el=document.getElementById('page-import-csv');
   const hasSupabase=!!SUPABASE_URL&&!!SUPABASE_ANON_KEY;
+  const recurringItems=(data.recurring||[]).filter(r=>r.amount&&r.category);
 
   const AMEX_CAT_MAP=[
     ['restaurant','Dining'],['dining','Dining'],['food & bev','Dining'],['café','Dining'],['cafe','Dining'],
-    ['grocery','Groceries'],['supermarket','Groceries'],['merchandise','Shopping'],['retail','Shopping'],['amazon','Shopping'],['walmart','Shopping'],['target','Shopping'],['costco','Groceries'],['home depot','Shopping'],
+    ['grocery','Groceries'],['supermarket','Groceries'],['merchandise','Shopping'],['retail','Shopping'],
+    ['amazon','Shopping'],['walmart','Shopping'],['target','Shopping'],['costco','Groceries'],['home depot','Shopping'],
     ['entertainment','Entertainment'],['movie','Entertainment'],['theater','Entertainment'],
     ['subscription','Subscriptions'],['streaming','Subscriptions'],['cable','Subscriptions'],
     ['telephone','Phone'],['wireless','Phone'],['cellular','Phone'],
@@ -1341,11 +1362,7 @@ function renderImportCSV(data){
     ['automotive','Car'],['auto ','Car'],
     ['insurance','Insurance'],
     ['health','Health'],['medical','Health'],['dental','Health'],['pharmacy','Health'],['doctor','Health'],
-    ['interest','Interest'],
-    ['utilities','Utilities'],
-    ['mortgage','Mortgage'],
-    ['loan','Loan'],
-    ['membership','Membership'],
+    ['interest','Interest'],['utilities','Utilities'],['mortgage','Mortgage'],['loan','Loan'],['membership','Membership'],
   ];
   const DESC_MAP=[
     ['netflix','Subscriptions'],['hulu','Subscriptions'],['spotify','Subscriptions'],['apple music','Subscriptions'],
@@ -1363,10 +1380,15 @@ function renderImportCSV(data){
   ];
 
   function guessCategory(desc,amexCat){
+    const saved=checkMerchantRules(desc);if(saved)return{cat:saved,src:'rule'};
     const d=desc.toLowerCase();
-    for(const[kw,cat]of DESC_MAP){if(d.includes(kw))return cat;}
-    if(amexCat){const ac=amexCat.toLowerCase();for(const[kw,cat]of AMEX_CAT_MAP){if(ac.includes(kw))return cat;}}
-    return'Random';
+    for(const[kw,cat]of DESC_MAP){if(d.includes(kw))return{cat,src:'known'};}
+    if(amexCat){const ac=amexCat.toLowerCase();for(const[kw,cat]of AMEX_CAT_MAP){if(ac.includes(kw))return{cat,src:'guess'};}}
+    return{cat:'Random',src:'fallback'};
+  }
+
+  function isRecurringMatch(row){
+    return recurringItems.some(r=>Math.abs(row.amt-parseFloat(r.amount||0))<=1&&r.category===row.cat);
   }
 
   function parseCSVLine(line){
@@ -1394,22 +1416,26 @@ function renderImportCSV(data){
       const amt=parseFloat(amtStr);
       if(!date||isNaN(amt)||amt<=0)continue;
       const dateFmt=date.replace(/\//g,'-');
-      rows.push({date:dateFmt,desc,amt,amexCat,cat:guessCategory(desc,amexCat),include:true});
+      const{cat,src}=guessCategory(desc,amexCat);
+      const rec=isRecurringMatch({amt,cat});
+      rows.push({date:dateFmt,desc,amt,amexCat,cat,src,isRecurring:rec,include:!rec});
     }
     return rows;
   }
 
-  const catOpts=EXPENSE_CATS.map(c=>`<option value="${c}">${c}</option>`).join('');
+  const ruleCount=Object.keys(getMerchantRules()).length;
 
   el.innerHTML=`
   <div class="page-header"><div><div class="page-title">Import CSV</div>
-  <div class="page-subtitle">Upload an American Express CSV to bulk-import transactions</div></div></div>
+  <div class="page-subtitle">Upload an American Express CSV to bulk-import transactions</div></div>
+  ${ruleCount?`<div style="font-size:12px;color:var(--accent);margin-top:4px">📌 ${ruleCount} merchant rule${ruleCount!==1?'s':''} saved — known merchants auto-categorize</div>`:''}
+  </div></div>
   ${!hasSupabase?`<div class="gas-banner"><div class="gas-banner-icon">⚠</div><div><strong>Supabase not connected</strong><p>You can preview transactions below, but saving requires Supabase credentials. Add them via <a onclick="window._openSettings()" style="cursor:pointer;color:var(--accent)">⚙ Settings</a>.</p></div></div>`:''}
   <div class="chart-card" style="margin-bottom:20px">
     <div style="font-size:13px;font-weight:600;margin-bottom:8px">How to export from American Express</div>
     <div style="font-size:13px;color:var(--text-dim);line-height:1.8">
       1. Log in at americanexpress.com<br>
-      2. Go to <strong>Account → Statements & Activity</strong><br>
+      2. Go to <strong>Account → Statements &amp; Activity</strong><br>
       3. Click <strong>Download</strong> → select date range → choose <strong>CSV</strong><br>
       4. Upload that file below
     </div>
@@ -1417,18 +1443,20 @@ function renderImportCSV(data){
   <div class="chart-card" style="margin-bottom:20px;text-align:center;padding:32px">
     <div style="font-size:32px;margin-bottom:12px">⬆</div>
     <div style="font-size:15px;font-weight:600;margin-bottom:8px">Choose your Amex CSV file</div>
-    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px">Payments and credits are automatically excluded</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px">Payments and credits are automatically excluded · Recurring matches auto-unchecked</div>
     <input type="file" id="csv-file-input" accept=".csv" style="display:none">
     <button class="btn btn-primary" onclick="document.getElementById('csv-file-input').click()">Browse File</button>
     <div id="csv-file-name" style="margin-top:10px;font-size:12px;color:var(--text-dim)"></div>
   </div>
   <div id="csv-preview" style="display:none">
+    <div id="csv-banners"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
       <div id="csv-summary" style="font-size:13px;color:var(--text-dim)"></div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="font-size:12px;color:var(--text-dim);display:flex;align-items:center;gap:6px;cursor:pointer">
           <input type="checkbox" id="csv-select-all" checked> Select all
         </label>
+        <button class="btn btn-secondary btn-sm" id="csv-uncheck-rec" style="display:none">Uncheck recurring</button>
         <button class="btn btn-primary" id="csv-import-btn" ${!hasSupabase?'disabled title="Connect Supabase in Settings first"':''}>Import Selected</button>
       </div>
     </div>
@@ -1439,9 +1467,70 @@ function renderImportCSV(data){
     </table>
     </div>
     <div id="csv-msg" style="margin-top:12px;font-size:13px"></div>
+    <div id="csv-rules-section"></div>
   </div>`;
 
   let parsedRows=[];
+
+  function buildBanners(){
+    const fallbacks=parsedRows.filter(r=>r.src==='fallback'&&r.include);
+    const recMatches=parsedRows.filter(r=>r.isRecurring);
+    let html='';
+    if(fallbacks.length)html+=`<div style="background:rgba(255,214,10,0.08);border:1px solid rgba(255,214,10,0.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:13px;color:#ffd60a">⚠ <strong>${fallbacks.length} transaction${fallbacks.length!==1?'s':''} need review</strong> — category defaulted to Random. Change the dropdown and the merchant will be remembered next time.</div>`;
+    if(recMatches.length)html+=`<div style="background:rgba(10,132,255,0.08);border:1px solid rgba(10,132,255,0.3);border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;font-size:13px;color:var(--blue)">ℹ <strong>${recMatches.length} recurring match${recMatches.length!==1?'es':''}</strong> found and unchecked — these match your Recurring tab entries. Re-check any you want to import anyway.</div>`;
+    document.getElementById('csv-banners').innerHTML=html;
+    const recBtn=document.getElementById('csv-uncheck-rec');
+    if(recBtn)recBtn.style.display=recMatches.filter(r=>r.include).length?'':'none';
+  }
+
+  function buildRulesSection(){
+    const rules=getMerchantRules();const keys=Object.keys(rules);
+    if(!keys.length){document.getElementById('csv-rules-section').innerHTML='';return;}
+    document.getElementById('csv-rules-section').innerHTML=`
+    <div style="margin-top:28px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin-bottom:10px">📌 Saved Merchant Rules (${keys.length})</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table class="data-table">
+          <thead><tr><th>Merchant keyword</th><th>Category</th><th style="width:60px"></th></tr></thead>
+          <tbody>${keys.map(k=>`<tr><td style="font-family:monospace;font-size:12px">${k}</td><td>${rules[k]}</td><td><button class="btn btn-sm btn-danger" onclick="window._deleteRule('${k.replace(/'/g,"\\'")}')">✕</button></td></tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  function buildTable(){
+    const total=parsedRows.filter(r=>r.include).reduce((s,r)=>s+r.amt,0);
+    const sel=parsedRows.filter(r=>r.include).length;
+    document.getElementById('csv-summary').textContent=`${parsedRows.length} transactions · ${sel} selected · ${fmt(total)} total`;
+    document.getElementById('csv-tbody').innerHTML=parsedRows.map((r,i)=>{
+      const isFallback=r.src==='fallback';
+      const rowStyle=r.isRecurring?'opacity:.45':isFallback&&r.include?'background:rgba(255,214,10,0.04)':'';
+      const catStyle=`background:var(--bg);border:1px solid ${isFallback&&r.include?'rgba(255,214,10,0.5)':'var(--border)'};border-radius:4px;padding:4px 6px;color:var(--text);font-size:12px;width:100%`;
+      const srcBadge=r.src==='rule'?'<span title="Matched by saved rule" style="color:var(--accent);font-size:10px;margin-left:4px">📌</span>':isFallback?'<span title="Needs review — no match found" style="color:#ffd60a;font-size:10px;margin-left:4px">?</span>':'';
+      return`<tr style="${rowStyle}${r.include?'':'opacity:.4'}">
+        <td><input type="checkbox" ${r.include?'checked':''} onchange="window._csvToggle(${i},this.checked)"></td>
+        <td style="white-space:nowrap">${r.date}</td>
+        <td style="font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.desc}">${r.desc}${srcBadge}${r.isRecurring?'<span title="Matches a recurring item" style="color:var(--blue);font-size:10px;margin-left:4px">↻</span>':''}</td>
+        <td class="text-right">${fmt(r.amt)}</td>
+        <td><select style="${catStyle}" onchange="window._csvCat(${i},this.value)">${EXPENSE_CATS.map(c=>`<option value="${c}" ${c===r.cat?'selected':''}>${c}</option>`).join('')}</select></td>
+      </tr>`;
+    }).join('');
+    buildBanners();
+    buildRulesSection();
+  }
+
+  window._csvToggle=function(i,v){parsedRows[i].include=v;buildTable()};
+  window._csvCat=function(i,v){
+    parsedRows[i].cat=v;parsedRows[i].src='rule';
+    saveMerchantRule(parsedRows[i].desc,v);
+    buildTable();
+  };
+  window._deleteRule=function(key){
+    deleteMerchantRule(key);buildRulesSection();
+    const ruleCountEl=document.querySelector('.page-subtitle+div');
+    const rc=Object.keys(getMerchantRules()).length;
+    if(ruleCountEl&&ruleCountEl.textContent.includes('merchant rule'))ruleCountEl.textContent=rc?`📌 ${rc} merchant rule${rc!==1?'s':''} saved — known merchants auto-categorize`:'';
+  };
 
   document.getElementById('csv-file-input').addEventListener('change',function(){
     const file=this.files[0];if(!file)return;
@@ -1456,25 +1545,12 @@ function renderImportCSV(data){
     reader.readAsText(file);
   });
 
-  function buildTable(){
-    const total=parsedRows.filter(r=>r.include).reduce((s,r)=>s+r.amt,0);
-    const sel=parsedRows.filter(r=>r.include).length;
-    document.getElementById('csv-summary').textContent=`${parsedRows.length} transactions found · ${sel} selected · ${fmt(total)} total`;
-    document.getElementById('csv-tbody').innerHTML=parsedRows.map((r,i)=>`
-      <tr style="${r.include?'':'opacity:.4'}">
-        <td><input type="checkbox" ${r.include?'checked':''} onchange="window._csvToggle(${i},this.checked)"></td>
-        <td style="white-space:nowrap">${r.date}</td>
-        <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.desc}">${r.desc}</td>
-        <td class="text-right">${fmt(r.amt)}</td>
-        <td><select style="background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:4px 6px;color:var(--text);font-size:12px;width:100%" onchange="window._csvCat(${i},this.value)">${EXPENSE_CATS.map(c=>`<option value="${c}" ${c===r.cat?'selected':''}>${c}</option>`).join('')}</select></td>
-      </tr>`).join('');
-  }
-
-  window._csvToggle=function(i,v){parsedRows[i].include=v;buildTable()};
-  window._csvCat=function(i,v){parsedRows[i].cat=v};
-
   document.getElementById('csv-select-all').addEventListener('change',function(){
     parsedRows.forEach(r=>r.include=this.checked);buildTable();
+  });
+
+  document.getElementById('csv-uncheck-rec').addEventListener('click',function(){
+    parsedRows.forEach(r=>{if(r.isRecurring)r.include=false});buildTable();
   });
 
   document.getElementById('csv-import-btn').addEventListener('click',async function(){
@@ -1492,7 +1568,7 @@ function renderImportCSV(data){
     }
     btn.disabled=false;btn.textContent='Import Selected';
     msgEl.innerHTML=errors===0
-      ?`<span style="color:var(--accent)">✓ ${done} transactions imported successfully. Hit ↻ Refresh to see updated data.</span>`
+      ?`<span style="color:var(--accent)">✓ ${done} transactions imported. Hit ↻ Refresh to see updated data.</span>`
       :`<span style="color:var(--yellow)">⚠ ${done} imported, ${errors} failed. Try again for failed rows.</span>`;
     parsedRows=parsedRows.filter(r=>!r.include);
     buildTable();

@@ -1959,8 +1959,7 @@ function renderLogInvestments(data){
       const btn=document.getElementById('linv-submit');btn.disabled=true;btn.textContent='Saving…';
       try{
         await sbInsert('investments',{date,account,value});
-        await sbInsert('net_worth',{date,name:account,value,type:'asset'});
-        showMsg('linv-msg','✓ Balance saved and net worth updated! Hit Refresh (↻) to update charts.','success');
+        showMsg('linv-msg','✓ Balance saved! Hit Refresh (↻) to update charts.','success');
         document.getElementById('linv-value').value='';
       }catch(e){showMsg('linv-msg','Error: '+e.message,'error')}
       finally{btn.disabled=false;btn.textContent='Save Balance'}

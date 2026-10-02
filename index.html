@@ -603,15 +603,21 @@ function renderDashboard(data){
     </div>
     <div class="chart-card" onclick="navigateTo('investments')" style="cursor:pointer">
       <div class="ov-section-header"><span>Investments</span><span class="ov-link">Details →</span></div>
-      ${invAccs.length>0?`<div class="chart-wrap" style="min-height:120px;max-height:180px"><canvas id="chart-ov-inv"></canvas></div><div style="display:flex;flex-direction:column;gap:4px;margin-top:10px;flex:1;overflow-y:auto">${invAccs.map(([a,{value}])=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text-muted)">${a}</span><span>${fmt(value)} <span style="color:var(--text-dim)">${invTotal>0?Math.round(value/invTotal*100):0}%</span></span></div>`).join('')}</div>`:`<div class="ov-empty" style="flex:1">No investment data</div>`}
-    </div>
-    <div class="chart-card">
-      <div class="ov-section-header"><span>Recurring</span><span class="ov-link" onclick="event.stopPropagation();navigateTo('recurring')" style="cursor:pointer">All →</span></div>
-      ${recItems.length>0?`<div style="display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto;margin-bottom:16px">${recItems.map(r=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text-muted)">${r.name}${r.frequency!=='monthly'?` <span style="font-size:10px;color:var(--text-dim)">${r.frequency}</span>`:''}</span><span>${fmt(r.amount)}</span></div>`).join('')}</div>`:`<div class="ov-empty" style="flex:1;margin-bottom:12px">No recurring set up</div>`}
-      <div style="border-top:1px solid var(--border);padding-top:14px">
+      ${invAccs.length>0?`<div class="chart-wrap" style="min-height:120px;max-height:180px"><canvas id="chart-ov-inv"></canvas></div><div style="display:flex;flex-direction:column;gap:4px;margin-top:10px">${invAccs.map(([a,{value}])=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text-muted)">${a}</span><span>${fmt(value)} <span style="color:var(--text-dim)">${invTotal>0?Math.round(value/invTotal*100):0}%</span></span></div>`).join('')}</div>`:`<div class="ov-empty">No investment data</div>`}
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
         <div class="ov-section-header" style="margin-bottom:10px"><span>Tax Pulse ${curYr}</span><span class="ov-link" onclick="event.stopPropagation();navigateTo('taxes')" style="cursor:pointer">Taxes →</span></div>
         ${txG>0?`<div style="display:flex;flex-direction:column;gap:5px"><div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text-muted)">YTD Gross</span><span>${fmt(txG)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text-muted)">YTD Withheld</span><span>${fmt(txW)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text-muted)">Est. Liability</span><span>${fmt(txL)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;padding-top:6px;border-top:1px solid var(--border)"><span style="color:var(--text)">${txRoe>=0?'Est. Refund':'Est. Owed'}</span><span style="font-weight:600;color:${txRoe>=0?'var(--accent)':'var(--danger)'}">${fmt(Math.abs(txRoe))}</span></div></div>`:`<div class="ov-empty">No paycheck data</div>`}
       </div>
+    </div>
+    <div class="chart-card" onclick="navigateTo('recurring')" style="cursor:pointer">
+      <div class="ov-section-header"><span>Recurring</span><span class="ov-link" onclick="event.stopPropagation();navigateTo('recurring')" style="cursor:pointer">All →</span></div>
+      ${recItems.length>0?`
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+          <span style="font-size:22px;font-weight:700;color:var(--accent)">${fmt(recItems.reduce((s,r)=>s+(r.frequency==='monthly'?r.amount:r.frequency==='annual'||r.frequency==='yearly'?r.amount/12:r.amount),0))}</span>
+          <span style="font-size:11px;color:var(--text-dim)">/mo est.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;flex:1;overflow-y:auto">${recItems.map(r=>`<div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--text-muted)">${r.name}${r.frequency!=='monthly'?` <span style="font-size:10px;color:var(--text-dim)">${r.frequency}</span>`:''}</span><span>${fmt(r.amount)}</span></div>`).join('')}</div>`
+      :`<div class="ov-empty" style="flex:1">No recurring set up</div>`}
     </div>
   </div>
 

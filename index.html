@@ -351,6 +351,30 @@ window.deleteEntryRow=async function(table,id,msgId){
 // ── CONSTANTS ───────────────────────────────────────────
 const EXPENSE_CATS = ['Shopping','Groceries','Dining','Entertainment','Subscriptions','Utilities','Mortgage','Car','Fuel','Phone','Internet','Random','Loan','Membership','Insurance','Health','Interest'];
 
+// ── DEBT HELPERS (module-level so expense save can access) ─
+function loadDebts(){try{const r=localStorage.getItem('fintrack_debts_v1');return r?JSON.parse(r):[]}catch{return[]}}
+function saveDebts(d){localStorage.setItem('fintrack_debts_v1',JSON.stringify(d))}
+
+async function autoUpdateDebtsFromExpense(date,expenseRow){
+  if(!SUPABASE_URL||!SUPABASE_ANON_KEY)return[];
+  const debts=loadDebts();const updates=[];let changed=false;
+  for(const debt of debts){
+    if(!debt.expenseCategory)continue;
+    const payment=parseFloat(expenseRow[debt.expenseCategory])||0;
+    if(payment<=0)continue;
+    const monthlyInterest=debt.currentBalance*((debt.interestRate||0)/100/12);
+    const principal=Math.max(0,payment-monthlyInterest);
+    if(principal<0.01)continue;
+    debt.currentBalance=Math.max(0,debt.currentBalance-principal);
+    changed=true;
+    try{await sbInsert('net_worth',{date,name:debt.name,value:-debt.currentBalance,type:'liability'});}
+    catch(e){console.warn('Net worth sync failed for',debt.name,e.message);}
+    updates.push(`${debt.name} −$${principal.toFixed(2)}`);
+  }
+  if(changed)saveDebts(debts);
+  return updates;
+}
+
 // ── MERCHANT RULES (localStorage) ───────────────────────
 function getMerchantRules(){try{return JSON.parse(localStorage.getItem('fintrack_merchant_rules')||'{}')}catch{return{}}}
 function _merchantKey(desc){
@@ -648,9 +672,6 @@ function renderDebts(data){
   const el=document.getElementById('page-debts');
   const DEBT_TYPES=['Mortgage','Auto Loan','Student Loan','Credit Card','Personal Loan','Medical','Other'];
 
-  function loadDebts(){try{const r=localStorage.getItem('fintrack_debts_v1');return r?JSON.parse(r):[]}catch(e){return[]}}
-  function saveDebts(d){localStorage.setItem('fintrack_debts_v1',JSON.stringify(d))}
-
   function calcPayoff(balance,ratePct,payment){
     const monthlyInterest=balance*(ratePct/100/12);
     if(balance<=0)return{months:0,totalInterest:0,monthlyInterest:0};
@@ -703,6 +724,7 @@ function renderDebts(data){
         <div class="dfg"><label>Current Balance ($)</label><input id="df-bal" type="number" min="0" placeholder="287000" /></div>
         <div class="dfg"><label>Interest Rate (% APR)</label><input id="df-rate" type="number" min="0" step="0.01" placeholder="7.25" /></div>
         <div class="dfg"><label>Min Monthly Payment ($)</label><input id="df-pmt" type="number" min="0" placeholder="2800" /></div>
+        <div class="dfg"><label>Expense Category <span style="font-weight:400;color:var(--text-dim);text-transform:none;letter-spacing:0">auto-reduce on payment</span></label><select id="df-cat"><option value="">None / Manual</option>${EXPENSE_CATS.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
       </div>
       <div class="form-actions">
         <button class="btn btn-primary btn-sm" onclick="window._debtSave()">Save Debt</button>
@@ -717,7 +739,7 @@ function renderDebts(data){
       const paidAmt=Math.max(0,d.originalBalance-d.currentBalance);
       return`<div class="debt-card">
         <div class="debt-hdr">
-          <div class="debt-title">${d.name} <span class="debt-badge">${d.type}</span></div>
+          <div class="debt-title">${d.name} <span class="debt-badge">${d.type}</span>${d.expenseCategory?`<span class="debt-badge" style="background:var(--accent-dim);color:var(--accent)">↻ ${d.expenseCategory}</span>`:''}</div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-sm" style="background:var(--surface-2);color:var(--text)" onclick="window._debtUpdateBal(${i})">Update Balance</button>
             <button class="btn btn-danger btn-sm" onclick="window._debtDelete(${i})">Remove</button>
@@ -766,9 +788,10 @@ function renderDebts(data){
       const bal=parseFloat(document.getElementById('df-bal').value)||0;
       const rate=parseFloat(document.getElementById('df-rate').value)||0;
       const pmt=parseFloat(document.getElementById('df-pmt').value)||0;
+      const cat=document.getElementById('df-cat').value;
       if(!name||bal<=0||pmt<=0){alert('Please fill in Name, Current Balance, and Minimum Payment.');return;}
       const debts=loadDebts();
-      debts.push({id:Date.now(),name,type,originalBalance:orig||bal,currentBalance:bal,interestRate:rate,minimumPayment:pmt});
+      debts.push({id:Date.now(),name,type,originalBalance:orig||bal,currentBalance:bal,interestRate:rate,minimumPayment:pmt,expenseCategory:cat||''});
       saveDebts(debts);render();
     };
 
@@ -1590,6 +1613,7 @@ function renderImportCSV(data){
       try{
         const row={date:r.date,income:0};EXPENSE_CATS.forEach(c=>{row[c]=c===r.cat?r.amt:0});
         await sbInsert('expenses',row);
+        await autoUpdateDebtsFromExpense(r.date,row);
         done++;btn.textContent=`Importing ${done}/${selected.length}…`;
       }catch(e){errors++;}
     }
@@ -1677,7 +1701,9 @@ function renderLogExpenses(data){
       const btn=document.getElementById('lw-submit');btn.disabled=true;btn.textContent='Saving…';
       try{
         await sbInsert('expenses',row);
-        showMsg('lw-msg','✓ Saved! Hit Refresh (↻) to update charts.','success');
+        const debtUpdates=await autoUpdateDebtsFromExpense(date,row);
+        const msg=debtUpdates.length?`✓ Saved! Auto-updated: ${debtUpdates.join(', ')}. Hit ↻ Refresh to update charts.`:'✓ Saved! Hit Refresh (↻) to update charts.';
+        showMsg('lw-msg',msg,'success');
         document.getElementById('lw-income').value='';
         EXPENSE_CATS.forEach(c=>{const i=document.getElementById(`lw-cat-${c}`);if(i)i.value=''});
       }catch(e){showMsg('lw-msg','Error: '+e.message,'error')}

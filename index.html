@@ -515,6 +515,8 @@ function renderDashboard(data){
   // ── Net Worth (manual entries + investments, asset/liability aware)
   function invAsOf(d){const ba={};data.investments.forEach(row=>{const rd=parseDate(row.date);if(!rd||!row.account||rd>d)return;const a=row.account.trim();if(!ba[a]||parseDate(ba[a].date)<rd)ba[a]={date:row.date,value:parseAmt(row.value)}});return Object.values(ba).reduce((s,a)=>s+a.value,0)}
   const nwByDate={};data.netWorth.forEach(row=>{const d=parseDate(row.date);if(!d)return;if(!nwByDate[row.date])nwByDate[row.date]={date:d,assets:0,liabs:0};const v=parseAmt(row.value);if(row.type==='liability')nwByDate[row.date].liabs+=Math.abs(v);else nwByDate[row.date].assets+=Math.abs(v)});
+  const ovTodayKey=new Date().toISOString().slice(0,10);if(!nwByDate[ovTodayKey]){const _s=Object.values(nwByDate).sort((a,b)=>a.date-b.date);nwByDate[ovTodayKey]={date:new Date(),assets:_s.length?_s[_s.length-1].assets:0,liabs:0};}
+  const _ovDebts=loadDebts();if(_ovDebts.length)nwByDate[ovTodayKey].liabs=_ovDebts.reduce((s,d)=>s+(d.currentBalance||0),0);
   const nwSnaps=Object.values(nwByDate).sort((a,b)=>a.date-b.date).map(s=>{const inv=invAsOf(s.date);return{date:s.date,assets:s.assets+inv,liabs:s.liabs,total:s.assets+inv-s.liabs}});
   const latNW=nwSnaps[nwSnaps.length-1];const prevNW=nwSnaps[nwSnaps.length-2];
   const nwVal=nwSnaps.length>0?latNW.total:invAsOf(new Date());const nwChg=latNW&&prevNW?latNW.total-prevNW.total:null;

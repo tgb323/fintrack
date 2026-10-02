@@ -742,7 +742,7 @@ function renderDebts(data){
         <div class="debt-hdr">
           <div class="debt-title">${d.name} <span class="debt-badge">${d.type}</span>${d.expenseCategory?`<span class="debt-badge" style="background:var(--accent-dim);color:var(--accent)">↻ ${d.expenseCategory}</span>`:''}</div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-sm" style="background:var(--surface-2);color:var(--text)" onclick="window._debtUpdateBal(${i})">Update Balance</button>
+            <button class="btn btn-sm" style="background:var(--surface-2);color:var(--text)" onclick="window._debtEdit(${i})">Edit</button>
             <button class="btn btn-danger btn-sm" onclick="window._debtDelete(${i})">Remove</button>
           </div>
         </div>
@@ -782,18 +782,49 @@ function renderDebts(data){
       </div>
     </div>`:''}`;
 
+    function readDebtForm(){
+      return{
+        name:document.getElementById('df-name').value.trim(),
+        type:document.getElementById('df-type').value,
+        orig:parseFloat(document.getElementById('df-orig').value)||0,
+        bal:parseFloat(document.getElementById('df-bal').value)||0,
+        rate:parseFloat(document.getElementById('df-rate').value)||0,
+        pmt:parseFloat(document.getElementById('df-pmt').value)||0,
+        cat:document.getElementById('df-cat').value||''
+      };
+    }
+
     window._debtSave=function(){
-      const name=document.getElementById('df-name').value.trim();
-      const type=document.getElementById('df-type').value;
-      const orig=parseFloat(document.getElementById('df-orig').value)||0;
-      const bal=parseFloat(document.getElementById('df-bal').value)||0;
-      const rate=parseFloat(document.getElementById('df-rate').value)||0;
-      const pmt=parseFloat(document.getElementById('df-pmt').value)||0;
-      const cat=document.getElementById('df-cat').value;
+      const{name,type,orig,bal,rate,pmt,cat}=readDebtForm();
       if(!name||bal<=0||pmt<=0){alert('Please fill in Name, Current Balance, and Minimum Payment.');return;}
       const debts=loadDebts();
-      debts.push({id:Date.now(),name,type,originalBalance:orig||bal,currentBalance:bal,interestRate:rate,minimumPayment:pmt,expenseCategory:cat||''});
+      debts.push({id:Date.now(),name,type,originalBalance:orig||bal,currentBalance:bal,interestRate:rate,minimumPayment:pmt,expenseCategory:cat});
       saveDebts(debts);render();
+    };
+
+    window._debtEdit=function(i){
+      const debts=loadDebts();const d=debts[i];
+      // Populate the add form with existing values and switch to edit mode
+      document.getElementById('df-name').value=d.name||'';
+      document.getElementById('df-type').value=d.type||DEBT_TYPES[0];
+      document.getElementById('df-orig').value=d.originalBalance||'';
+      document.getElementById('df-bal').value=d.currentBalance||'';
+      document.getElementById('df-rate').value=d.interestRate||'';
+      document.getElementById('df-pmt').value=d.minimumPayment||'';
+      document.getElementById('df-cat').value=d.expenseCategory||'';
+      const form=document.getElementById('debt-add-form');
+      form.style.display='block';form.scrollIntoView({behavior:'smooth',block:'nearest'});
+      // Switch Save button to Update mode
+      const saveBtn=form.querySelector('button.btn-primary');
+      saveBtn.textContent='Update Debt';
+      saveBtn.onclick=function(){
+        const{name,type,orig,bal,rate,pmt,cat}=readDebtForm();
+        if(!name||bal<=0||pmt<=0){alert('Please fill in Name, Current Balance, and Minimum Payment.');return;}
+        debts[i]={...debts[i],name,type,originalBalance:orig||bal,currentBalance:bal,interestRate:rate,minimumPayment:pmt,expenseCategory:cat};
+        saveDebts(debts);
+        saveBtn.textContent='Save Debt';saveBtn.onclick=window._debtSave;
+        render();
+      };
     };
 
     window._debtDelete=function(i){
@@ -801,16 +832,18 @@ function renderDebts(data){
       const debts=loadDebts();debts.splice(i,1);saveDebts(debts);render();
     };
 
-    window._debtUpdateBal=function(i){
-      const debts=loadDebts();
-      const d=debts[i];
+    window._debtUpdateBal=async function(i){
+      const debts=loadDebts();const d=debts[i];
       const input=prompt(`New current balance for "${d.name}":`,d.currentBalance);
       if(input===null)return;
       const val=parseFloat(input);
       if(isNaN(val)||val<0){alert('Please enter a valid balance.');return;}
-      debts[i].currentBalance=val;
-      saveDebts(debts);render();
-      setTimeout(()=>alert(`✓ Balance updated for "${d.name}".\n\n📌 Reminder: Also log this as a liability in Log Net Worth so your net worth stays accurate.`),50);
+      debts[i].currentBalance=val;saveDebts(debts);render();
+      if(SUPABASE_URL&&SUPABASE_ANON_KEY){
+        const today=new Date().toISOString().slice(0,10);
+        try{await sbInsert('net_worth',{date:today,name:d.name,value:-val,type:'liability'});}
+        catch(e){console.warn('Net worth sync failed:',e.message);}
+      }
     };
   }
 

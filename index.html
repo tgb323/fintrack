@@ -360,8 +360,9 @@ async function autoUpdateDebtsFromExpense(date,expenseRow){
   const debts=loadDebts();const updates=[];let changed=false;
   for(const debt of debts){
     if(!debt.expenseCategory)continue;
-    const payment=parseFloat(expenseRow[debt.expenseCategory])||0;
-    if(payment<=0)continue;
+    const categoryAmt=parseFloat(expenseRow[debt.expenseCategory])||0;
+    if(categoryAmt<=0)continue; // only trigger if a payment was logged this period
+    const payment=debt.minimumPayment; // each debt uses its own payment, not the shared total
     const monthlyInterest=debt.currentBalance*((debt.interestRate||0)/100/12);
     const principal=Math.max(0,payment-monthlyInterest);
     if(principal<0.01)continue;

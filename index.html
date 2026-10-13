@@ -804,7 +804,7 @@ function renderDebts(data){
 
     window._debtSave=function(){
       const{name,type,orig,bal,rate,pmt,cat}=readDebtForm();
-      if(!name||bal<=0||pmt<=0){alert('Please fill in Name, Current Balance, and Minimum Payment.');return;}
+      if(!name||bal<0||pmt<0){alert('Please fill in Name and valid Balance/Payment amounts.');return;}
       const debts=loadDebts();
       debts.push({id:Date.now(),name,type,originalBalance:orig||bal,currentBalance:bal,interestRate:rate,minimumPayment:pmt,expenseCategory:cat});
       saveDebts(debts);render();
@@ -827,7 +827,7 @@ function renderDebts(data){
       saveBtn.textContent='Update Debt';
       saveBtn.onclick=function(){
         const{name,type,orig,bal,rate,pmt,cat}=readDebtForm();
-        if(!name||bal<=0||pmt<=0){alert('Please fill in Name, Current Balance, and Minimum Payment.');return;}
+        if(!name||bal<0||pmt<0){alert('Please fill in Name and valid Balance/Payment amounts.');return;}
         debts[i]={...debts[i],name,type,originalBalance:orig||bal,currentBalance:bal,interestRate:rate,minimumPayment:pmt,expenseCategory:cat};
         saveDebts(debts);
         saveBtn.textContent='Save Debt';saveBtn.onclick=window._debtSave;
